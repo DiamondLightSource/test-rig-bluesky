@@ -12,7 +12,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 description = "Bluesky plans to be run on Diamond's test rigs e.g. ViSR, P45, etc"
-dependencies = [] # Add project dependencies here, e.g. ["click", "numpy"]
+dependencies = ["dls-dodal"]
 dynamic = ["version"]
 license.file = "LICENSE"
 readme = "README.md"
@@ -47,7 +47,7 @@ version_file = "src/test_rig_bluesky/_version.py"
 
 [tool.pyright]
 typeCheckingMode = "standard"
-reportMissingImports = false # Ignore missing stubs in imported modules
+reportMissingImports = false  # Ignore missing stubs in imported modules
 
 [tool.pytest.ini_options]
 # Run pytest with all our checkers, and don't spam us with massive tracebacks on error
