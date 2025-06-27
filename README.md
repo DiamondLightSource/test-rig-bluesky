@@ -6,4 +6,3 @@
 # test_rig_bluesky
 
 Bluesky plans to be run on Diamond's test rigs e.g. ViSR, P45, etc
-
