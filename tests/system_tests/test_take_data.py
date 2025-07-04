@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any
 
 from blueapi.client.client import BlueapiClient
-from blueapi.worker.task import Task
+from blueapi.service.model import TaskRequest
 from bluesky_stomp.messaging import MessageContext, StompClient
 from bluesky_stomp.models import MessageTopic
 
@@ -25,11 +25,12 @@ def test_collect_data(
 
     # Run plan
     end_event = client.run_task(
-        Task(
+        TaskRequest(
             name="count",
-            params={"detectors": ["manta"], "num": 5},
-            # instrument_session=latest_comissioning_instrument_session,
-        )
+            params={"detectors": ["sample_det"], "num": 5},
+            instrument_session=latest_comissioning_instrument_session,
+        ),
+        timeout=10.0,
     )
     task_id = end_event.task_status.task_id
 
