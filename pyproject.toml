@@ -28,6 +28,7 @@ dev = [
     "ruff",
     "tox-direct",
     "types-mock",
+    "blueapi==1.0.0-rc1",
 ]
 
 [project.scripts]
@@ -72,7 +73,7 @@ legacy_tox_ini = """
 [tox]
 skipsdist=True
 
-[testenv:{pre-commit,type-checking,tests}]
+[testenv:{pre-commit,type-checking,tests,system-test}]
 # Don't create a virtualenv for the command, requires tox-direct plugin
 direct = True
 passenv = *
@@ -83,7 +84,8 @@ allowlist_externals =
 commands =
     pre-commit: pre-commit run --all-files --show-diff-on-failure {posargs}
     type-checking: pyright src tests {posargs}
-    tests: pytest --cov=test_rig_bluesky --cov-report term --cov-report xml:cov.xml {posargs}
+    tests: pytest --cov=test_rig_bluesky --cov-report term --cov-report xml:cov.xml tests/unit_tests {posargs}
+    system-test: pytest tests/system_tests {posargs}
 """
 
 [tool.ruff]
