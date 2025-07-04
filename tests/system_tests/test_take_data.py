@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any
 
 from blueapi.client.client import BlueapiClient
-from blueapi.worker.task import Task
+from blueapi.service.model import TaskRequest
 from bluesky_stomp.messaging import MessageContext, StompClient
 from bluesky_stomp.models import MessageTopic
 
@@ -11,7 +11,7 @@ from bluesky_stomp.models import MessageTopic
 def test_collect_data(
     client: BlueapiClient,
     stomp_client: StompClient,
-    latest_comissioning_instrument_session: str,
+    latest_commissioning_instrument_session: str,
     data_directory: Path,
 ) -> None:
     # Listen for NeXus file events, see below
@@ -25,12 +25,14 @@ def test_collect_data(
 
     # Run plan
     end_event = client.run_task(
-        Task(
+        TaskRequest(
             name="count",
-            params={"detectors": ["manta"], "num": 5},
-            # instrument_session=latest_comissioning_instrument_session,
-        )
+            params={"detectors": ["sample_det"], "num": 5},
+            instrument_session=latest_commissioning_instrument_session,
+        ),
+        timeout=10.0,
     )
+    assert end_event.task_status is not None
     task_id = end_event.task_status.task_id
 
     # Check task ran and did not error
@@ -39,7 +41,7 @@ def test_collect_data(
     assert len(task.errors) == 0
 
     # Search for a new NeXus file event, with numtracker
-    # we will be able to programatically corelate the
+    # we will be able to programmatically correlate the
     # file with the plan, see
     # https://jira.diamond.ac.uk/browse/DCS-194
     nexus_finished_message.result(timeout=10.0)

@@ -28,7 +28,7 @@ dev = [
     "ruff",
     "tox-direct",
     "types-mock",
-    "blueapi",
+    "blueapi==1.0.0-rc1",
 ]
 
 [project.scripts]

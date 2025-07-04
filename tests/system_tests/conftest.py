@@ -17,7 +17,7 @@ def instrument() -> str:
 
 
 @pytest.fixture
-def latest_comissioning_instrument_session() -> str:
+def latest_commissioning_instrument_session() -> str:
     # Hardcoding this until a suitable API comes along
     return "cm40661-1"
 
@@ -26,7 +26,7 @@ def latest_comissioning_instrument_session() -> str:
 def data_directory(
     instrument: str, latest_comissioning_instrument_session: str
 ) -> Path:
-    # Should retireve this info from numtracker
+    # Should retrieve this info from numtracker
     return (
         Path("/dls")
         / instrument
@@ -52,6 +52,9 @@ def client(config: ApplicationConfig) -> BlueapiClient:
 
 @pytest.fixture
 def stomp_client(config: ApplicationConfig) -> Generator[StompClient]:
+    assert config.stomp.url.host is not None
+    assert config.stomp.url.port is not None
+
     client = StompClient.for_broker(
         broker=Broker(
             host=config.stomp.url.host,
