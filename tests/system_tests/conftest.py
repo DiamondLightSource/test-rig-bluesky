@@ -24,7 +24,7 @@ def latest_commissioning_instrument_session() -> str:
 
 @pytest.fixture
 def data_directory(
-    instrument: str, latest_comissioning_instrument_session: str
+    instrument: str, latest_commissioning_instrument_session: str
 ) -> Path:
     # Should retrieve this info from numtracker
     return (
@@ -32,7 +32,7 @@ def data_directory(
         / instrument
         / "data"
         / "2025"
-        / latest_comissioning_instrument_session
+        / latest_commissioning_instrument_session
     )
 
 
