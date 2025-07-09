@@ -5,8 +5,9 @@ from bluesky import RunEngine
 from dodal.beamlines.b01_1 import oav, sample_det, sample_stage
 from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.testing import assert_emitted, callback_on_mock_put, set_mock_value
+from scanspec.specs import Line
 
-from test_rig_bluesky.plans import snapshot
+from test_rig_bluesky.plans import snapshot, spectroscopy
 
 
 def mock_detector_behavior(detector: AravisDetector) -> None:
@@ -47,6 +48,72 @@ def test_snapshot(RE: RunEngine):
     )
     assert docs["stream_resource"][0].get("data_key") == "sample_det"
     assert docs["stream_resource"][1].get("data_key") == "oav"
+    assert docs["event"][0]["data"] == {
+        "sample_stage-x": 0.0,
+        "sample_stage-y": 0.0,
+        "sample_stage-z": 0.0,
+    }
+
+
+def test_spectroscopy(RE: RunEngine):
+    docs = defaultdict(list)
+    RE.subscribe(lambda name, doc: docs[name].append(doc))
+
+    _oav = oav(connect_immediately=True, mock=True)
+    mock_detector_behavior(_oav)
+
+    _sample_stage = sample_stage(connect_immediately=True, mock=True)
+    set_mock_value(_sample_stage.x.velocity, 1.0)
+    set_mock_value(_sample_stage.y.velocity, 1.0)
+
+    RE(
+        spectroscopy(
+            _oav,
+            _sample_stage,
+            Line(_sample_stage.y, 4.2, 6, 3) * Line(_sample_stage.x, 0, 5, 10),
+        )
+    )
+
+    assert_emitted(
+        docs,
+        start=1,
+        descriptor=1,
+        stream_resource=1,
+        stream_datum=30,
+        event=30,
+        stop=1,
+    )
+    assert docs["stream_resource"][0].get("data_key") == "oav"
+    assert docs["event"][0]["data"] == {
+        "sample_stage-x": 0.0,
+        "sample_stage-y": 0.0,
+        "sample_stage-z": 0.0,
+    }
+
+
+def test_spectroscopy_default_spec(RE: RunEngine):
+    docs = defaultdict(list)
+    RE.subscribe(lambda name, doc: docs[name].append(doc))
+
+    _oav = oav(connect_immediately=True, mock=True)
+    mock_detector_behavior(_oav)
+
+    _sample_stage = sample_stage(connect_immediately=True, mock=True)
+    set_mock_value(_sample_stage.x.velocity, 1.0)
+    set_mock_value(_sample_stage.y.velocity, 1.0)
+
+    RE(spectroscopy(_oav, _sample_stage))
+
+    assert_emitted(
+        docs,
+        start=1,
+        descriptor=1,
+        stream_resource=1,
+        stream_datum=5,
+        event=5,
+        stop=1,
+    )
+    assert docs["stream_resource"][0].get("data_key") == "oav"
     assert docs["event"][0]["data"] == {
         "sample_stage-x": 0.0,
         "sample_stage-y": 0.0,
