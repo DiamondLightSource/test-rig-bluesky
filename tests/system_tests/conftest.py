@@ -8,6 +8,8 @@ from blueapi.config import ApplicationConfig, ConfigLoader
 from bluesky_stomp.messaging import StompClient
 from bluesky_stomp.models import Broker
 
+from test_rig_bluesky.testing import BlueskyPlanRunner
+
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 
@@ -65,3 +67,12 @@ def stomp_client(config: ApplicationConfig) -> Generator[StompClient]:
     client.connect()
     yield client
     client.disconnect()
+
+
+@pytest.fixture
+def bluesky_plan_runner(
+    client: BlueapiClient,
+    stomp_client: StompClient,
+    data_directory: Path,
+) -> BlueskyPlanRunner:
+    return BlueskyPlanRunner(client, stomp_client)
