@@ -11,10 +11,13 @@ from test_rig_bluesky.plans import snapshot
 
 def mock_detector_behavior(detector: AravisDetector) -> None:
     async def mock_acquisition() -> None:
+        # Get number of images to capture per acquire
         num_images = await detector.driver.num_images.get_value()
         set_mock_value(detector.fileio.num_capture, num_images)
 
-        for i in range(1, num_images + 1):
+        # Increment from current num captured to new value
+        current_num_captured = await detector.fileio.num_captured.get_value()
+        for i in range(current_num_captured, current_num_captured + num_images + 1):
             set_mock_value(detector.fileio.num_captured, i)
 
     async def on_acquire(acquire: bool, wait: bool) -> None:
