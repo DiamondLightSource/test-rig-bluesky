@@ -20,7 +20,7 @@ def snapshot(
     sample_det: AravisDetector = sample_det,
     oav: AravisDetector = oav,
     sample_stage: XYZStage = sample_stage,
-):
+) -> MsgGenerator[None]:
     """Capture a snapshot of the current state of the beamline."""
     yield from count([sample_det, oav, sample_stage])
 
