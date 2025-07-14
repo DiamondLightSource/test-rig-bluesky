@@ -55,7 +55,7 @@ def test_snapshot(RE: RunEngine):
     }
 
 
-def test_spectroscopy(RE: RunEngine):
+async def test_spectroscopy(RE: RunEngine):
     docs = defaultdict(list)
     RE.subscribe(lambda name, doc: docs[name].append(doc))
 
@@ -71,8 +71,11 @@ def test_spectroscopy(RE: RunEngine):
             _oav,
             _sample_stage,
             Line(_sample_stage.y, 4.2, 6, 3) * Line(_sample_stage.x, 0, 5, 10),
+            0.2,
         )
     )
+
+    assert await _oav.driver.acquire_time.get_value() == 0.2
 
     assert_emitted(
         docs,
@@ -91,7 +94,7 @@ def test_spectroscopy(RE: RunEngine):
     }
 
 
-def test_spectroscopy_default_spec(RE: RunEngine):
+async def test_spectroscopy_defaults(RE: RunEngine):
     docs = defaultdict(list)
     RE.subscribe(lambda name, doc: docs[name].append(doc))
 
@@ -103,6 +106,8 @@ def test_spectroscopy_default_spec(RE: RunEngine):
     set_mock_value(_sample_stage.y.velocity, 1.0)
 
     RE(spectroscopy(_oav, _sample_stage))
+
+    assert await _oav.driver.acquire_time.get_value() == 0.1
 
     assert_emitted(
         docs,
