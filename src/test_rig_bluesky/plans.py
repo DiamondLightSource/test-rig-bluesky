@@ -1,5 +1,6 @@
 from typing import Any
 
+from bluesky import plan_stubs as bps
 from bluesky.plans import count
 from bluesky.utils import MsgGenerator
 from dodal.common import inject
@@ -7,6 +8,7 @@ from dodal.common.beamlines.beamline_utils import get_path_provider
 from dodal.devices.motors import XYZStage
 from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from dodal.plans import spec_scan
+from ophyd_async.core import TriggerInfo
 from ophyd_async.epics.adaravis import AravisDetector
 from scanspec.specs import Line, Spec
 
@@ -29,9 +31,12 @@ def spectroscopy(
     oav: AravisDetector = oav,
     sample_stage: XYZStage = sample_stage,
     spec: Spec | None = None,
+    exposure_time: float = 0.1,
     metadata: dict[str, Any] | None = None,
 ) -> MsgGenerator[None]:
     """Do a spectroscopy scan."""
+    yield from bps.prepare(oav, TriggerInfo(livetime=exposure_time))
+
     spec = spec or Line(sample_stage.x, 0, 5, 5)
 
     yield from spec_scan({oav, sample_stage}, spec, metadata=metadata)
