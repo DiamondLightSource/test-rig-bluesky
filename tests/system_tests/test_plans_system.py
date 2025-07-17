@@ -1,14 +1,31 @@
-from bluesky import RunEngine
-from dodal.beamlines.b01_1 import oav, sample_det, sample_stage
+from blueapi.service.model import TaskRequest
 
-from test_rig_bluesky.plans import snapshot
+from test_rig_bluesky.testing import BlueskyPlanRunner
 
 
-def test_snapshot():
-    RE = RunEngine()
+def test_snapshot(
+    bluesky_plan_runner: BlueskyPlanRunner, latest_commissioning_instrument_session: str
+):
+    events = bluesky_plan_runner.run(
+        TaskRequest(
+            name="snapshot",
+            params={},
+            instrument_session=latest_commissioning_instrument_session,
+        ),
+        timeout=10,
+    )
+    assert events["FINISHED"][0]["scanDimensions"] == [1]
 
-    _sample_det = sample_det(connect_immediately=True)
-    _oav = oav(connect_immediately=True)
-    _sample_stage = sample_stage(connect_immediately=True)
 
-    RE(snapshot(_sample_det, _oav, _sample_stage))
+def test_spectroscopy(
+    bluesky_plan_runner: BlueskyPlanRunner, latest_commissioning_instrument_session: str
+):
+    events = bluesky_plan_runner.run(
+        TaskRequest(
+            name="spectroscopy",
+            params={},
+            instrument_session=latest_commissioning_instrument_session,
+        ),
+        timeout=10,
+    )
+    assert events["FINISHED"][0]["scanDimensions"] == [5]
