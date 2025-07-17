@@ -24,6 +24,7 @@ dev = [
     "pre-commit",
     "pyright",
     "pytest",
+    "pytest-asyncio",
     "pytest-cov",
     "ruff",
     "tox-direct",
@@ -58,6 +59,8 @@ addopts = """
 filterwarnings = "error"
 # Doctest python code in docs, python code in src docstrings, test functions in tests
 testpaths = "docs src tests"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.run]
 data_file = "/tmp/test_rig_bluesky.coverage"
