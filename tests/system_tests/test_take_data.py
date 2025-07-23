@@ -9,7 +9,7 @@ def test_collect_data(
     bluesky_plan_runner.run(
         TaskRequest(
             name="count",
-            params={"detectors": ["sample_det"], "num": 5},
+            params={"detectors": ["spectroscopy_detector"], "num": 5},
             instrument_session=latest_commissioning_instrument_session,
         ),
         timeout=10.0,
