@@ -29,3 +29,17 @@ def test_spectroscopy(
         timeout=10,
     )
     assert events["FINISHED"][0]["scanDimensions"] == [5]
+
+
+def test_demo_spectroscopy(
+    bluesky_plan_runner: BlueskyPlanRunner, latest_commissioning_instrument_session: str
+):
+    events = bluesky_plan_runner.run(
+        TaskRequest(
+            name="demo_spectroscopy",
+            params={},
+            instrument_session=latest_commissioning_instrument_session,
+        ),
+        timeout=10,
+    )
+    assert events["FINISHED"][0]["scanDimensions"] == [5, 5]
