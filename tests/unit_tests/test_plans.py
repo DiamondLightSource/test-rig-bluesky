@@ -1,4 +1,5 @@
 import asyncio
+import unittest.mock
 from collections import defaultdict
 
 from bluesky import RunEngine
@@ -7,7 +8,7 @@ from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.testing import assert_emitted, callback_on_mock_put, set_mock_value
 from scanspec.specs import Line
 
-from test_rig_bluesky.plans import snapshot, spectroscopy
+from test_rig_bluesky.plans import demo_spectroscopy, snapshot, spectroscopy
 
 
 def mock_detector_behavior(detector: AravisDetector) -> None:
@@ -132,3 +133,27 @@ def test_spectroscopy_prepares_and_waits_before_doing_anything_else(RE: RunEngin
 
     assert message_1.command == "prepare"
     assert message_2.command == "wait"
+
+
+def test_demo_spectroscopy():
+    fake_detector = unittest.mock.MagicMock(name="fake_detector")
+    fake_stage = unittest.mock.MagicMock(name="fake_stage")
+    with unittest.mock.patch("test_rig_bluesky.plans.spectroscopy") as mock_spec:
+        # Call the generator function and exhaust it
+        generator = demo_spectroscopy(
+            spectroscopy_detector=fake_detector,
+            sample_stage=fake_stage,
+            total_number_of_scan_points=25,
+        )
+
+        # Consume the generator so that the spectroscopy call is made
+        for _ in generator:
+            pass
+
+    mock_spec.assert_called_once()
+    called_kwargs = mock_spec.call_args.kwargs
+    assert called_kwargs["spectroscopy_detector"] is fake_detector
+    assert called_kwargs["sample_stage"] is fake_stage
+    assert called_kwargs["spec"] == Line(fake_stage.y, 0.0, 5.0, 5) * Line(
+        fake_stage.x, 0.0, 5.0, 5
+    )
