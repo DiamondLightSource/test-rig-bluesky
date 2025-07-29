@@ -1,3 +1,4 @@
+import math
 from typing import Any
 
 from bluesky import plan_stubs as bps
@@ -41,3 +42,34 @@ def spectroscopy(
     spec = spec or Line(sample_stage.x, 0, 5, 5)
 
     yield from spec_scan({spectroscopy_detector, sample_stage}, spec, metadata=metadata)
+
+
+def demo_spectroscopy(
+    spectroscopy_detector: AravisDetector = spectroscopy_detector,
+    sample_stage: XYZStage = sample_stage,
+    total_number_of_scan_points: int = 25,
+    grid_size: float = 5.0,
+    grid_origin_x: float = 0.0,
+    grid_origin_y: float = 0.0,
+    exposure_time: float = 0.1,
+    metadata: dict[str, Any] | None = None,
+) -> MsgGenerator[None]:
+    """Spectroscopy plan intended for use in Visr demonstrations to visitors.
+    The time taken to scan is approximately linear in total_numbers_of_grid_points.
+    All other parameters can be left at their defaults.
+    """
+    xsteps = ysteps = int(round(math.sqrt(max(total_number_of_scan_points, 1))))
+    xmin = grid_origin_x
+    xmax = grid_origin_x + grid_size
+    ymin = grid_origin_y
+    ymax = grid_origin_y + grid_size
+    grid = Line(sample_stage.y, ymin, ymax, ysteps) * Line(
+        sample_stage.x, xmin, xmax, xsteps
+    )
+    yield from spectroscopy(
+        spectroscopy_detector=spectroscopy_detector,
+        sample_stage=sample_stage,
+        spec=grid,
+        exposure_time=exposure_time,
+        metadata=metadata,
+    )
