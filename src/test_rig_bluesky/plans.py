@@ -35,7 +35,9 @@ def spectroscopy(
     metadata: dict[str, Any] | None = None,
 ) -> MsgGenerator[None]:
     """Do a spectroscopy scan."""
-    yield from bps.prepare(spectroscopy_detector, TriggerInfo(livetime=exposure_time))
+    yield from bps.prepare(
+        spectroscopy_detector, TriggerInfo(livetime=exposure_time), wait=True
+    )
 
     spec = spec or Line(sample_stage.x, 0, 5, 5)
 
