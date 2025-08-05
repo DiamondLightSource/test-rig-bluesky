@@ -4,8 +4,5 @@ stomp:
   auth:
     username: guest
     password: guest
-  url: http://b01-1-rabbitmq-daq.diamond.ac.uk:61613
+  url: tcp://b01-1-rabbitmq-daq.diamond.ac.uk:61613
   enabled: true
-oidc:
-  well_known_url: https://authn.diamond.ac.uk/realms/master/.well-known/openid-configuration
-  client_id: blueapi-cli
