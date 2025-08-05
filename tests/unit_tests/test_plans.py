@@ -124,3 +124,11 @@ async def test_spectroscopy_defaults(RE: RunEngine):
         "sample_stage-y": 0.0,
         "sample_stage-z": 0.0,
     }
+
+
+def test_spectroscopy_prepares_and_waits_before_doing_anything_else(RE: RunEngine):
+    plan = spectroscopy()
+    message_1, message_2 = next(plan), next(plan)
+
+    assert message_1.command == "prepare"
+    assert message_2.command == "wait"
