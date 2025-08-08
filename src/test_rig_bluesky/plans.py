@@ -4,7 +4,6 @@ from bluesky import plan_stubs as bps
 from bluesky.plans import count
 from bluesky.utils import MsgGenerator
 from dodal.common import inject
-from dodal.common.beamlines.beamline_utils import get_path_provider
 from dodal.devices.motors import XYZStage
 from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from dodal.plans import spec_scan
@@ -17,7 +16,7 @@ spectroscopy_detector = inject("spectroscopy_detector")
 sample_stage = inject("sample_stage")
 
 
-@attach_data_session_metadata_decorator(get_path_provider())
+@attach_data_session_metadata_decorator()
 def snapshot(
     imaging_detector: AravisDetector = imaging_detector,
     spectroscopy_detector: AravisDetector = spectroscopy_detector,
