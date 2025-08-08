@@ -7,7 +7,7 @@ from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.testing import assert_emitted, callback_on_mock_put, set_mock_value
 from scanspec.specs import Line
 
-from test_rig_bluesky.plans import snapshot, spectroscopy
+from test_rig_bluesky.plans import demo_spectroscopy, snapshot, spectroscopy
 
 
 def mock_detector_behavior(detector: AravisDetector) -> None:
@@ -132,3 +132,42 @@ def test_spectroscopy_prepares_and_waits_before_doing_anything_else(RE: RunEngin
 
     assert message_1.command == "prepare"
     assert message_2.command == "wait"
+
+
+async def test_demo_spectroscopy(RE: RunEngine):
+    docs = defaultdict(list)
+    RE.subscribe(lambda name, doc: docs[name].append(doc))
+
+    _spectroscopy_detector = spectroscopy_detector(connect_immediately=True, mock=True)
+    mock_detector_behavior(_spectroscopy_detector)
+
+    _sample_stage = sample_stage(connect_immediately=True, mock=True)
+    set_mock_value(_sample_stage.x.velocity, 1.0)
+    set_mock_value(_sample_stage.y.velocity, 1.0)
+
+    num_points = 9
+    RE(
+        demo_spectroscopy(
+            _spectroscopy_detector,
+            _sample_stage,
+            num_points,
+        )
+    )
+
+    assert await _spectroscopy_detector.driver.acquire_time.get_value() == 0.1
+
+    assert_emitted(
+        docs,
+        start=1,
+        descriptor=1,
+        stream_resource=1,
+        stream_datum=num_points,
+        event=num_points,
+        stop=1,
+    )
+    assert docs["stream_resource"][0].get("data_key") == "spectroscopy_detector"
+    assert docs["event"][0]["data"] == {
+        "sample_stage-x": 0.0,
+        "sample_stage-y": 0.0,
+        "sample_stage-z": 0.0,
+    }
