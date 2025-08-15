@@ -1,4 +1,6 @@
 import os
+import socket
+import textwrap
 from collections.abc import Generator
 from pathlib import Path
 
@@ -11,6 +13,35 @@ from bluesky_stomp.models import Broker
 from test_rig_bluesky.testing import BlueskyPlanRunner
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
+
+BEAMLINE_HOSTS = [
+    "b01-1-ws001.diamond.ac.uk",
+    "b01-1-control.diamond.ac.uk",
+    "bl01c-ea-serv-01.diamond.ac.uk",
+    "bl01c-di-serv-01.diamond.ac.uk",
+]
+
+
+def pytest_configure(config: pytest.Config):
+    config.addinivalue_line(
+        "markers", "control_system: test requires direct access to the control system"
+    )
+
+
+def pytest_runtest_setup(item: pytest.Item):
+    if next(item.iter_markers(name="control_system"), None) is not None:
+        if not on_controllable_machine():
+            pytest.skip(
+                reason=textwrap.dedent(f"""
+                    This test needs direct access to the control system and can only
+                    be run from one of the following machines: {BEAMLINE_HOSTS}
+                """)
+            )
+
+
+def on_controllable_machine() -> bool:
+    hostname = socket.gethostname()
+    return hostname in BEAMLINE_HOSTS
 
 
 @pytest.fixture
