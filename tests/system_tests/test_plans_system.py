@@ -1,3 +1,4 @@
+import pytest
 from blueapi.service.model import TaskRequest
 from bluesky import RunEngine
 from dodal.beamlines.b01_1 import sample_stage, spectroscopy_detector
@@ -51,6 +52,7 @@ def test_demo_spectroscopy(
     assert events["FINISHED"][0]["scanDimensions"] == [5, 5]
 
 
+@pytest.mark.control_system
 def test_spectroscopy_re():
     RE = RunEngine()
     _spectroscopy_detector = spectroscopy_detector(connect_immediately=True)
