@@ -78,17 +78,14 @@ def spectroscopy(
             wait=True,
         )
 
-        # TODO: We can't include all the channels as it makes the xml longer than 256
-        # params.append(
-        params = [
+        params.append(
             NDAttributePv(
                 name=f"{roi.name}Total",
                 signal=roistatn.total,
                 dbrtype=NDAttributePvDbrType.DBR_LONG,
                 description=f"Sum of {roi.name} channel",
             )
-        ]
-        # )
+        )
 
     yield from setup_ndattributes(spectroscopy_detector.roistat, params)  # type: ignore
 
