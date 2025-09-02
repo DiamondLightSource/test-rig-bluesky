@@ -1,4 +1,5 @@
 import math
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,16 +11,46 @@ from dodal.common import inject
 from dodal.devices.motors import XYZStage
 from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from dodal.plans import spec_scan
-from ophyd_async.core import TriggerInfo
+from ophyd_async.core import TriggerInfo, YamlSettingsProvider
 from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.epics.adcore import NDAttributePv, NDAttributePvDbrType
 from ophyd_async.epics.adcore._core_io import NDROIStatNIO
-from ophyd_async.plan_stubs import setup_ndattributes
+from ophyd_async.plan_stubs import (
+    apply_settings,
+    apply_settings_if_different,
+    retrieve_settings,
+    setup_ndattributes,
+    store_settings,
+)
 from scanspec.specs import Line, Spec
 
 imaging_detector = inject("imaging_detector")
 spectroscopy_detector = inject("spectroscopy_detector")
 sample_stage = inject("sample_stage")
+
+yaml_directory = os.path.abspath(".")
+yaml_filename = "spectroscopy_detector_baseline"
+
+
+def save_settings(
+    spectroscopy_detector: AravisDetector = spectroscopy_detector,
+    yaml_directory: str = yaml_directory,
+    yaml_filename: str = yaml_filename,
+):
+    provider = YamlSettingsProvider(yaml_directory)
+    yield from store_settings(provider, yaml_filename, spectroscopy_detector)
+
+
+def load_settings(
+    spectroscopy_detector: AravisDetector = spectroscopy_detector,
+    yaml_directory: str = yaml_directory,
+    yaml_filename: str = yaml_filename,
+):
+    provider = YamlSettingsProvider(yaml_directory)
+    settings = yield from retrieve_settings(
+        provider, yaml_filename, spectroscopy_detector
+    )
+    yield from apply_settings_if_different(settings, apply_settings)
 
 
 @dataclass
