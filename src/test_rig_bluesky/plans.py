@@ -28,7 +28,7 @@ imaging_detector = inject("imaging_detector")
 spectroscopy_detector = inject("spectroscopy_detector")
 sample_stage = inject("sample_stage")
 
-yaml_directory = os.path.abspath(".")
+yaml_directory = os.path.abspath("./src/test_rig_bluesky/")
 yaml_filename = "spectroscopy_detector_baseline"
 
 
