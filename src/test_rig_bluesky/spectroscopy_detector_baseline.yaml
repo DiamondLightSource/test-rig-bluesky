@@ -1,41 +1,6 @@
-driver.acquire: false
 driver.acquire_period: 0.021815
 driver.acquire_time: 0.100001
-driver.array_counter: 5
-driver.image_mode: Multiple
-driver.nd_attributes_file: ""
-driver.num_images: 1
-driver.trigger_mode: "Off"
-driver.trigger_source: Freerun
-driver.wait_for_plugins: false
-fileio.acquire: false
-fileio.array_counter: 5
-fileio.auto_increment: true
-fileio.capture: false
-fileio.chunk_size_auto: true
-fileio.compression: None
-fileio.create_directory: 0
-fileio.enable_callbacks: Enable
-fileio.file_name: 3d94649a-9435-4e46-94a3-7357ef59afd8
-fileio.file_number: 1
-fileio.file_path: /tmp/
-fileio.file_template: "%s%s.h5"
-fileio.file_write_mode: Stream
-fileio.flush_now: false
-fileio.lazy_open: true
-fileio.nd_array_address: 0
 fileio.nd_array_port: D2.roistat
-fileio.nd_attributes_file: ""
-fileio.num_capture: 0
-fileio.num_extra_dims: 0
-fileio.num_frames_chunks: 1
-fileio.position_mode: false
-fileio.queue_size: 2
-fileio.swmr_mode: true
-fileio.wait_for_plugins: false
-fileio.xml_file_name: ""
-roistat.acquire: false
-roistat.array_counter: 5
 roistat.channels.1.min_x: 95
 roistat.channels.1.min_y: 610
 roistat.channels.1.name_: Red
@@ -54,12 +19,7 @@ roistat.channels.3.name_: Blue
 roistat.channels.3.size_x: 150
 roistat.channels.3.size_y: 150
 roistat.channels.3.use: true
-roistat.enable_callbacks: Enable
-roistat.nd_array_address: 0
-roistat.nd_array_port: D2.CAM
 roistat.nd_attributes_file:
   <Attributes><Attribute name="RedTotal" type="EPICS_PV"
   source="BL01C-DI-DCAM-02:ROISTAT:1:Total_RBV" dbrtype="DBR_LONG" description="Sum
   of Red channel" /></Attributes>
-roistat.queue_size: 2
-roistat.wait_for_plugins: false
