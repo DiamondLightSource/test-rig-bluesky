@@ -1,6 +1,5 @@
 import math
 import os
-from dataclasses import dataclass
 from typing import Any
 
 from bluesky import plan_stubs as bps
@@ -11,15 +10,12 @@ from dodal.common import inject
 from dodal.devices.motors import XYZStage
 from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from dodal.plans import spec_scan
-from ophyd_async.core import TriggerInfo, YamlSettingsProvider
+from ophyd_async.core import YamlSettingsProvider
 from ophyd_async.epics.adaravis import AravisDetector
-from ophyd_async.epics.adcore import NDAttributePv, NDAttributePvDbrType
-from ophyd_async.epics.adcore._core_io import NDROIStatNIO
 from ophyd_async.plan_stubs import (
     apply_settings,
     apply_settings_if_different,
     retrieve_settings,
-    setup_ndattributes,
     store_settings,
 )
 from scanspec.specs import Line, Spec
@@ -53,15 +49,6 @@ def load_settings(
     yield from apply_settings_if_different(settings, apply_settings)
 
 
-@dataclass
-class ROI:
-    channel: int
-    name: str
-    start_x: int
-    start_y: int
-    size: int
-
-
 @attach_data_session_metadata_decorator()
 def snapshot(
     imaging_detector: AravisDetector = imaging_detector,
@@ -80,48 +67,7 @@ def spectroscopy(
     metadata: dict[str, Any] | None = None,
 ) -> MsgGenerator[None]:
     """Do a spectroscopy scan."""
-    yield from bps.prepare(
-        spectroscopy_detector, TriggerInfo(livetime=exposure_time), wait=True
-    )
-    # TODO: This would be nicer if NDArrayBaseIO had a PortName signal
-    yield from bps.abs_set(
-        spectroscopy_detector.fileio.nd_array_port, "D2.roistat", wait=True
-    )
-
-    rois = [
-        ROI(2, "Green", 880, 605, 150),
-        ROI(3, "Blue", 1665, 600, 150),
-        ROI(1, "Red", 95, 610, 150),
-    ]
-
-    params: list[NDAttributePv] = []
-    for roi in rois:
-        roistatn = spectroscopy_detector.roistat.channels[roi.channel]  # type: ignore
-        assert isinstance(roistatn, NDROIStatNIO)
-
-        yield from bps.mv(
-            *(roistatn.name_, roi.name),
-            *(roistatn.min_x, roi.start_x),
-            *(roistatn.min_y, roi.start_y),
-            *(roistatn.size_x, roi.size),
-            *(roistatn.size_y, roi.size),
-            *(roistatn.use, True),
-            wait=True,
-        )
-
-        # TODO: We can't include all the channels as it makes the xml longer than 256
-        # params.append(
-        params = [
-            NDAttributePv(
-                name=f"{roi.name}Total",
-                signal=roistatn.total,
-                dbrtype=NDAttributePvDbrType.DBR_LONG,
-                description=f"Sum of {roi.name} channel",
-            )
-        ]
-        # )
-
-    yield from setup_ndattributes(spectroscopy_detector.roistat, params)  # type: ignore
+    yield from load_settings(spectroscopy_detector, yaml_directory, yaml_filename)
 
     for motor in [sample_stage.x, sample_stage.y]:
         yield from bps.mv(
