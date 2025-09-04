@@ -1,5 +1,3 @@
-driver.acquire_period: 0.021815
-driver.acquire_time: 0.100001
 fileio.nd_array_port: D2.roistat
 roistat.channels.1.min_x: 95
 roistat.channels.1.min_y: 610
