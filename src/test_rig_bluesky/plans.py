@@ -10,7 +10,7 @@ from dodal.common import inject
 from dodal.devices.motors import XYZStage
 from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from dodal.plans import spec_scan
-from ophyd_async.core import YamlSettingsProvider
+from ophyd_async.core import TriggerInfo, YamlSettingsProvider
 from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.plan_stubs import (
     apply_settings,
@@ -67,6 +67,9 @@ def spectroscopy(
     metadata: dict[str, Any] | None = None,
 ) -> MsgGenerator[None]:
     """Do a spectroscopy scan."""
+    yield from bps.prepare(
+        spectroscopy_detector, TriggerInfo(livetime=exposure_time), wait=True
+    )
     yield from load_settings(spectroscopy_detector, yaml_directory, yaml_filename)
 
     for motor in [sample_stage.x, sample_stage.y]:
