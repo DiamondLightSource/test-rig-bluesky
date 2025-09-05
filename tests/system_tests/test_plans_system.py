@@ -40,7 +40,7 @@ def test_demo_spectroscopy(
     bluesky_plan_runner: BlueskyPlanRunner, latest_commissioning_instrument_session: str
 ):
     _sample_stage = sample_stage()
-    scan_spec = Line(_sample_stage.x, 2, 5, 30) * Line(_sample_stage.y, 0, 5, 50)
+    scan_spec = Line(_sample_stage.y, 0, 5, 50) * Line(_sample_stage.x, 2, 5, 30)
     events = bluesky_plan_runner.run(
         TaskRequest(
             name="demo_spectroscopy",
@@ -58,6 +58,6 @@ def test_spectroscopy_re():
     _spectroscopy_detector = spectroscopy_detector(connect_immediately=True)
     _sample_stage = sample_stage(connect_immediately=True)
 
-    scan_spec = Line(_sample_stage.x, 2, 5, 30) * Line(_sample_stage.y, 0, 5, 50)
+    scan_spec = Line(_sample_stage.y, 0, 5, 50) * Line(_sample_stage.x, 2, 5, 30)
 
     RE(spectroscopy(_spectroscopy_detector, _sample_stage, scan_spec))

@@ -110,8 +110,8 @@ async def test_spectroscopy(RE: RunEngine):
         docs,
         start=1,
         descriptor=1,
-        stream_resource=2,
-        stream_datum=2 * 30,
+        stream_resource=4,
+        stream_datum=4 * 30,
         event=30,
         stop=1,
     )
@@ -142,8 +142,8 @@ async def test_spectroscopy_defaults(RE: RunEngine):
         docs,
         start=1,
         descriptor=1,
-        stream_resource=2,
-        stream_datum=2 * 5,
+        stream_resource=4,
+        stream_datum=4 * 5,
         event=5,
         stop=1,
     )
