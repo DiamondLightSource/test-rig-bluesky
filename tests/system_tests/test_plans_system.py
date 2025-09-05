@@ -83,6 +83,41 @@ def test_demo_spectroscopy_with_custom_trajectory(
     assert events["FINISHED"][0]["scanDimensions"] == [5, 5]
 
 
+def test_generic_count(
+    bluesky_plan_runner: BlueskyPlanRunner, latest_commissioning_instrument_session: str
+) -> None:
+    bluesky_plan_runner.run(
+        TaskRequest(
+            name="count",
+            params={
+                "detectors": ["imaging_detector", "spectroscopy_detector"],
+                "num": 5,
+            },
+            instrument_session=latest_commissioning_instrument_session,
+        ),
+        timeout=10.0,
+    )
+
+
+def test_generic_scan(
+    bluesky_plan_runner: BlueskyPlanRunner, latest_commissioning_instrument_session: str
+) -> None:
+    scan_spec = Line("sample_stage.x", 0.0, 5.0, 2) * Line(
+        "sample_stage.y", 2.0, 5.0, 2
+    )
+    bluesky_plan_runner.run(
+        TaskRequest(
+            name="spec_scan",
+            params={
+                "detectors": ["imaging_detector", "spectroscopy_detector"],
+                "spec": scan_spec.serialize(),
+            },
+            instrument_session=latest_commissioning_instrument_session,
+        ),
+        timeout=40.0,
+    )
+
+
 @pytest.mark.control_system
 def test_spectroscopy_re():
     RE = RunEngine()
