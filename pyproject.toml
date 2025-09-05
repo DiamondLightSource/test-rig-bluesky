@@ -11,9 +11,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 description = "Bluesky plans to be run on Diamond's test rigs e.g. ViSR, P45, etc"
-dependencies = [
-    "dls-dodal @ git+https://github.com/DiamondLightSource/dodal.git"
-]
+dependencies = ["dls-dodal>=1.56.0"]
 dynamic = ["version"]
 license.file = "LICENSE"
 readme = "README.md"
@@ -21,6 +19,7 @@ requires-python = ">=3.11"
 
 [project.optional-dependencies]
 dev = [
+    "blueapi>=1.2.1",
     "copier",
     "pipdeptree",
     "pre-commit",
@@ -31,7 +30,6 @@ dev = [
     "ruff",
     "tox-direct",
     "types-mock",
-    "blueapi==1.0.0-rc1",
 ]
 
 [project.scripts]
