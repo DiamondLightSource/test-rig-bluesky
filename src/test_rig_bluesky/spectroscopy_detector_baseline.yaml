@@ -17,7 +17,3 @@ roistat.channels.3.name_: Blue
 roistat.channels.3.size_x: 150
 roistat.channels.3.size_y: 150
 roistat.channels.3.use: true
-roistat.nd_attributes_file:
-  <Attributes><Attribute name="RedTotal" type="EPICS_PV"
-  source="BL01C-DI-DCAM-02:ROISTAT:1:Total_RBV" dbrtype="DBR_LONG" description="Sum
-  of Red channel" /></Attributes>
