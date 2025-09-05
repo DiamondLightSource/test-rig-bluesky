@@ -12,7 +12,7 @@ from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from dodal.plans import spec_scan
 from ophyd_async.core import Device, TriggerInfo, YamlSettingsProvider
 from ophyd_async.epics.adaravis import AravisDetector
-from ophyd_async.epics.adcore import NDAttributePV, NDAttributePVDbrType
+from ophyd_async.epics.adcore import NDAttributePv, NDAttributePvDbrType
 from ophyd_async.epics.adcore._core_io import NDROIStatNIO
 from ophyd_async.plan_stubs import (
     apply_settings,
@@ -28,13 +28,12 @@ spectroscopy_detector = inject("spectroscopy_detector")
 sample_stage = inject("sample_stage")
 
 yaml_directory = os.path.abspath("./src/test_rig_bluesky/")
-yaml_filename = "spectroscopy_detector_baseline"
 
 
 def save_settings(
     device: Device,
+    yaml_filename: str,
     yaml_directory: str = yaml_directory,
-    yaml_filename: str = yaml_filename,
 ):
     provider = YamlSettingsProvider(yaml_directory)
     yield from store_settings(provider, yaml_filename, device)
@@ -42,8 +41,8 @@ def save_settings(
 
 def load_settings(
     device: Device,
+    yaml_filename: str,
     yaml_directory: str = yaml_directory,
-    yaml_filename: str = yaml_filename,
 ):
     provider = YamlSettingsProvider(yaml_directory)
     settings = yield from retrieve_settings(provider, yaml_filename, device)
@@ -74,20 +73,20 @@ def spectroscopy(
 
     yield from load_settings(
         device=spectroscopy_detector,
-        yaml_directory=yaml_directory,
         yaml_filename="spectroscopy_detector_baseline",
+        yaml_directory=yaml_directory,
     )
 
-    params: list[NDAttributePV] = []
+    params: list[NDAttributePv] = []
     for channel in spectroscopy_detector.roistat.channels:
         roistatn = spectroscopy_detector.roistat.channels[channel]  # type: ignore
         assert isinstance(roistatn, NDROIStatNIO)
 
         params.append(
-            NDAttributePV(
+            NDAttributePv(
                 name=f"{roistatn.name_}Total",
                 signal=roistatn.total,
-                dbrtype=NDAttributePVDbrType.DBR_LONG,
+                dbrtype=NDAttributePvDbrType.DBR_LONG,
                 description=f"Sum of {roistatn.name_} channel",
             )
         )
@@ -96,8 +95,8 @@ def spectroscopy(
 
     # yield from load_settings(
     #     device=spectroscopy_detector,
-    #     yaml_directory=yaml_directory,
     #     yaml_filename="sample_stage_baseline",
+    #     yaml_directory=yaml_directory,
     # )
 
     for motor in [sample_stage.x, sample_stage.y]:
