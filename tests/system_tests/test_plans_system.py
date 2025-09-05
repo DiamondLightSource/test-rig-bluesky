@@ -28,7 +28,6 @@ def test_spectroscopy(
     events = bluesky_plan_runner.run(
         TaskRequest(
             name="spectroscopy",
-            params={},
             instrument_session=latest_commissioning_instrument_session,
         ),
         timeout=10,
@@ -36,18 +35,50 @@ def test_spectroscopy(
     assert events["FINISHED"][0]["scanDimensions"] == [5]
 
 
-def test_demo_spectroscopy(
+def test_spectroscopy_with_custom_trajectory(
     bluesky_plan_runner: BlueskyPlanRunner, latest_commissioning_instrument_session: str
 ):
-    _sample_stage = sample_stage()
-    scan_spec = Line(_sample_stage.y, 0, 5, 50) * Line(_sample_stage.x, 2, 5, 30)
+    scan_spec = Line("sample_stage.x", 0.0, 5.0, 5) * Line(
+        "sample_stage.y", 2.0, 5.0, 3
+    )
     events = bluesky_plan_runner.run(
         TaskRequest(
-            name="demo_spectroscopy",
+            name="spectroscopy",
             params={"spec": scan_spec.serialize()},
             instrument_session=latest_commissioning_instrument_session,
         ),
-        timeout=10,
+        timeout=30,
+    )
+    assert events["FINISHED"][0]["scanDimensions"] == [5, 3]
+
+
+def test_demo_spectroscopy(
+    bluesky_plan_runner: BlueskyPlanRunner, latest_commissioning_instrument_session: str
+):
+    events = bluesky_plan_runner.run(
+        TaskRequest(
+            name="demo_spectroscopy",
+            instrument_session=latest_commissioning_instrument_session,
+        ),
+        timeout=60,
+    )
+    assert events["FINISHED"][0]["scanDimensions"] == [5, 5]
+
+
+def test_demo_spectroscopy_with_custom_trajectory(
+    bluesky_plan_runner: BlueskyPlanRunner, latest_commissioning_instrument_session: str
+):
+    events = bluesky_plan_runner.run(
+        TaskRequest(
+            name="demo_spectroscopy",
+            params={
+                "exposure_time": 0.05,
+                "grid_size": 2.5,
+                "grid_origin_y": 0.5,
+            },
+            instrument_session=latest_commissioning_instrument_session,
+        ),
+        timeout=40,
     )
     assert events["FINISHED"][0]["scanDimensions"] == [5, 5]
 
