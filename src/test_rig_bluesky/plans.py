@@ -32,20 +32,18 @@ yaml_directory = os.path.abspath("./src/test_rig_bluesky/")
 
 def save_settings(
     device: Device,
-    yaml_filename: str,
-    yaml_directory: str = yaml_directory,
+    design_name: str,
 ):
     provider = YamlSettingsProvider(yaml_directory)
-    yield from store_settings(provider, yaml_filename, device)
+    yield from store_settings(provider, design_name, device)
 
 
 def load_settings(
     device: Device,
-    yaml_filename: str,
-    yaml_directory: str = yaml_directory,
+    design_name: str,
 ):
     provider = YamlSettingsProvider(yaml_directory)
-    settings = yield from retrieve_settings(provider, yaml_filename, device)
+    settings = yield from retrieve_settings(provider, design_name, device)
     yield from apply_settings_if_different(settings, apply_settings)
 
 
@@ -73,8 +71,7 @@ def spectroscopy(
 
     yield from load_settings(
         device=spectroscopy_detector,
-        yaml_filename="spectroscopy_detector_baseline",
-        yaml_directory=yaml_directory,
+        design_name="spectroscopy_detector_baseline",
     )
 
     params: list[NDAttributePv] = []
@@ -94,9 +91,8 @@ def spectroscopy(
     yield from setup_ndattributes(spectroscopy_detector.roistat, params)  # type:ignore
 
     # yield from load_settings(
-    #     device=spectroscopy_detector,
-    #     yaml_filename="sample_stage_baseline",
-    #     yaml_directory=yaml_directory,
+    #     device=sample_stage,
+    #     design_name="sample_stage_baseline",
     # )
 
     for motor in [sample_stage.x, sample_stage.y]:
