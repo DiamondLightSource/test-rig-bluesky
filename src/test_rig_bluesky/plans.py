@@ -90,17 +90,10 @@ def spectroscopy(
 
     yield from setup_ndattributes(spectroscopy_detector.roistat, params)  # type:ignore
 
-    # yield from load_settings(
-    #     device=sample_stage,
-    #     design_name="sample_stage_baseline",
-    # )
-
-    for motor in [sample_stage.x, sample_stage.y]:
-        yield from bps.mv(
-            *(motor.acceleration_time, 0.001),
-            *(motor.velocity, 100),
-            wait=True,
-        )
+    yield from load_settings(
+        device=sample_stage,
+        design_name="sample_stage_baseline",
+    )
 
     spec = spec or Line(sample_stage.x, 0, 5, 5)
 
