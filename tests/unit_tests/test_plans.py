@@ -8,7 +8,13 @@ from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.testing import assert_emitted, callback_on_mock_put, set_mock_value
 from scanspec.specs import Line
 
-from test_rig_bluesky.plans import demo_spectroscopy, snapshot, spectroscopy
+from test_rig_bluesky.plans import (
+    demo_spectroscopy,
+    load_settings,
+    save_settings,
+    snapshot,
+    spectroscopy,
+)
 
 
 def mock_detector_behavior(detector: AravisDetector) -> None:
@@ -28,6 +34,28 @@ def mock_detector_behavior(detector: AravisDetector) -> None:
 
     set_mock_value(detector.fileio.file_path_exists, True)
     callback_on_mock_put(detector.driver.acquire, on_acquire)
+
+
+def test_save_settings(RE: RunEngine):
+    _spectroscopy_detector = spectroscopy_detector(connect_immediately=True, mock=True)
+    mock_detector_behavior(_spectroscopy_detector)
+
+    RE(
+        save_settings(
+            _spectroscopy_detector, yaml_directory="/tmp", yaml_filename="test"
+        )
+    )
+
+
+def test_load_settings(RE: RunEngine):
+    _spectroscopy_detector = spectroscopy_detector(connect_immediately=True, mock=True)
+    mock_detector_behavior(_spectroscopy_detector)
+
+    RE(
+        load_settings(
+            _spectroscopy_detector, yaml_directory="/tmp", yaml_filename="test"
+        )
+    )
 
 
 def test_snapshot(RE: RunEngine):
