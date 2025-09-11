@@ -5,6 +5,6 @@ metadata:
   title: test-rig-bluesky
   description: Bluesky plans to be run on Diamond's test rigs e.g. ViSR, P45, etc
 spec:
-  type: library
+  type: service
   lifecycle: production
   owner: group:default/sscc

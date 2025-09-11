@@ -9,7 +9,14 @@ Bluesky plans to be run on Diamond's test rigs e.g. ViSR, P45, etc
 
 ## Running the system tests
 
+<<<<<<< before updating
 This repository contains some system tests in `tests/system_tests`, they are scripts that are intended to be run against live test rigs to prove they are working as expected. These should run regularly to make sure the beamline stays in a working state.
+=======
+Source          | <https://github.com/DiamondLightSource/test-rig-bluesky>
+:---:           | :---:
+Docker          | `docker run ghcr.io/diamondlightsource/test-rig-bluesky:latest`
+Releases        | <https://github.com/DiamondLightSource/test-rig-bluesky/releases>
+>>>>>>> after updating
 
 ```
 # Login so blueapi will accept your commands
