@@ -15,8 +15,9 @@ ENV PATH=/venv/bin:$PATH
 # The build stage installs the context into the venv
 FROM developer AS build
 # Requires buildkit 0.17.0
-COPY --chmod=o+wrX . /workspaces/test-rig-bluesky
+COPY . /workspaces/test-rig-bluesky
 WORKDIR /workspaces/test-rig-bluesky
+RUN chmod o+wrX .
 RUN touch dev-requirements.txt && pip install -c dev-requirements.txt .
 
 
@@ -48,5 +49,5 @@ COPY --from=build /venv/ /venv/
 ENV PATH=/venv/bin:$PATH
 
 # change this entrypoint if it is not the same as the repo
-ENTRYPOINT ["test-rig-bluesky"]
-CMD ["--version"]
+ENTRYPOINT ["blueapi"]
+CMD ["serve"]
