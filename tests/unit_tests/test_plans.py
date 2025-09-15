@@ -64,6 +64,11 @@ async def test_spectroscopy(RE: RunEngine):
     mock_detector_behavior(_spectroscopy_detector)
 
     _sample_stage = sample_stage(connect_immediately=True, mock=True)
+    set_mock_value(_sample_stage.x.low_limit_travel, -10.0)
+    set_mock_value(_sample_stage.x.high_limit_travel, 10.0)
+    set_mock_value(_sample_stage.y.low_limit_travel, -10.0)
+    set_mock_value(_sample_stage.y.high_limit_travel, 10.0)
+
     set_mock_value(_sample_stage.x.velocity, 1.0)
     set_mock_value(_sample_stage.y.velocity, 1.0)
 
@@ -103,6 +108,11 @@ async def test_spectroscopy_defaults(RE: RunEngine):
     mock_detector_behavior(_spectroscopy_detector)
 
     _sample_stage = sample_stage(connect_immediately=True, mock=True)
+    set_mock_value(_sample_stage.x.low_limit_travel, -10.0)
+    set_mock_value(_sample_stage.x.high_limit_travel, 10.0)
+    set_mock_value(_sample_stage.y.low_limit_travel, -10.0)
+    set_mock_value(_sample_stage.y.high_limit_travel, 10.0)
+
     set_mock_value(_sample_stage.x.velocity, 1.0)
     set_mock_value(_sample_stage.y.velocity, 1.0)
 
