@@ -52,7 +52,7 @@ def instrument() -> str:
 @pytest.fixture
 def latest_commissioning_instrument_session() -> str:
     # Hardcoding this until a suitable API comes along
-    return "cm40661-1"
+    return "cm40661-6"
 
 
 @pytest.fixture
