@@ -2,8 +2,10 @@ import asyncio
 import unittest.mock
 from collections import defaultdict
 
+import pytest
 from bluesky import RunEngine
 from dodal.beamlines.b01_1 import imaging_detector, sample_stage, spectroscopy_detector
+from dodal.devices.motors import XYZStage
 from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.testing import assert_emitted, callback_on_mock_put, set_mock_value
 from scanspec.specs import Line
@@ -11,7 +13,36 @@ from scanspec.specs import Line
 from test_rig_bluesky.plans import demo_spectroscopy, snapshot, spectroscopy
 
 
-def mock_detector_behavior(detector: AravisDetector) -> None:
+@pytest.fixture
+def _imaging_detector() -> AravisDetector:
+    det = imaging_detector(connect_immediately=True, mock=True)
+    _mock_detector_behavior(det)
+    return det
+
+
+@pytest.fixture
+def _spectroscopy_detector() -> AravisDetector:
+    det = spectroscopy_detector(connect_immediately=True, mock=True)
+    _mock_detector_behavior(det)
+    return det
+
+
+@pytest.fixture
+def _sample_stage() -> XYZStage:
+    stage = sample_stage(connect_immediately=True, mock=True)
+
+    set_mock_value(stage.x.low_limit_travel, -10.0)
+    set_mock_value(stage.x.high_limit_travel, 10.0)
+    set_mock_value(stage.y.low_limit_travel, -10.0)
+    set_mock_value(stage.y.high_limit_travel, 10.0)
+
+    set_mock_value(stage.x.velocity, 1.0)
+    set_mock_value(stage.y.velocity, 1.0)
+
+    return stage
+
+
+def _mock_detector_behavior(detector: AravisDetector) -> None:
     async def mock_acquisition() -> None:
         # Get number of images to capture per acquire
         num_images = await detector.driver.num_images.get_value()
@@ -30,17 +61,14 @@ def mock_detector_behavior(detector: AravisDetector) -> None:
     callback_on_mock_put(detector.driver.acquire, on_acquire)
 
 
-def test_snapshot(RE: RunEngine):
+def test_snapshot(
+    RE: RunEngine,
+    _imaging_detector: AravisDetector,
+    _spectroscopy_detector: AravisDetector,
+    _sample_stage: XYZStage,
+):
     docs = defaultdict(list)
     RE.subscribe(lambda name, doc: docs[name].append(doc))
-
-    _imaging_detector = imaging_detector(connect_immediately=True, mock=True)
-    mock_detector_behavior(_imaging_detector)
-
-    _spectroscopy_detector = spectroscopy_detector(connect_immediately=True, mock=True)
-    mock_detector_behavior(_spectroscopy_detector)
-
-    _sample_stage = sample_stage(connect_immediately=True, mock=True)
 
     RE(snapshot(_imaging_detector, _spectroscopy_detector, _sample_stage))
 
@@ -56,21 +84,13 @@ def test_snapshot(RE: RunEngine):
     }
 
 
-async def test_spectroscopy(RE: RunEngine):
+async def test_spectroscopy(
+    RE: RunEngine,
+    _spectroscopy_detector: AravisDetector,
+    _sample_stage: XYZStage,
+):
     docs = defaultdict(list)
     RE.subscribe(lambda name, doc: docs[name].append(doc))
-
-    _spectroscopy_detector = spectroscopy_detector(connect_immediately=True, mock=True)
-    mock_detector_behavior(_spectroscopy_detector)
-
-    _sample_stage = sample_stage(connect_immediately=True, mock=True)
-    set_mock_value(_sample_stage.x.low_limit_travel, -10.0)
-    set_mock_value(_sample_stage.x.high_limit_travel, 10.0)
-    set_mock_value(_sample_stage.y.low_limit_travel, -10.0)
-    set_mock_value(_sample_stage.y.high_limit_travel, 10.0)
-
-    set_mock_value(_sample_stage.x.velocity, 1.0)
-    set_mock_value(_sample_stage.y.velocity, 1.0)
 
     RE(
         spectroscopy(
@@ -100,21 +120,13 @@ async def test_spectroscopy(RE: RunEngine):
     }
 
 
-async def test_spectroscopy_defaults(RE: RunEngine):
+async def test_spectroscopy_defaults(
+    RE: RunEngine,
+    _spectroscopy_detector: AravisDetector,
+    _sample_stage: XYZStage,
+):
     docs = defaultdict(list)
     RE.subscribe(lambda name, doc: docs[name].append(doc))
-
-    _spectroscopy_detector = spectroscopy_detector(connect_immediately=True, mock=True)
-    mock_detector_behavior(_spectroscopy_detector)
-
-    _sample_stage = sample_stage(connect_immediately=True, mock=True)
-    set_mock_value(_sample_stage.x.low_limit_travel, -10.0)
-    set_mock_value(_sample_stage.x.high_limit_travel, 10.0)
-    set_mock_value(_sample_stage.y.low_limit_travel, -10.0)
-    set_mock_value(_sample_stage.y.high_limit_travel, 10.0)
-
-    set_mock_value(_sample_stage.x.velocity, 1.0)
-    set_mock_value(_sample_stage.y.velocity, 1.0)
 
     RE(spectroscopy(_spectroscopy_detector, _sample_stage))
 
