@@ -120,10 +120,10 @@ def test_generic_scan(
 
 @pytest.mark.control_system
 def test_spectroscopy_re():
-    RE = RunEngine()
+    run_engine = RunEngine()
     _spectroscopy_detector = spectroscopy_detector(connect_immediately=True)
     _sample_stage = sample_stage(connect_immediately=True)
 
     scan_spec = Line(_sample_stage.y, 0, 5, 50) * Line(_sample_stage.x, 2, 5, 30)
 
-    RE(spectroscopy(_spectroscopy_detector, _sample_stage, scan_spec))
+    run_engine(spectroscopy(_spectroscopy_detector, _sample_stage, scan_spec))

@@ -62,15 +62,15 @@ def _mock_detector_behavior(detector: AravisDetector) -> None:
 
 
 def test_snapshot(
-    RE: RunEngine,
+    run_engine: RunEngine,
     _imaging_detector: AravisDetector,
     _spectroscopy_detector: AravisDetector,
     _sample_stage: XYZStage,
 ):
     docs = defaultdict(list)
-    RE.subscribe(lambda name, doc: docs[name].append(doc))
+    run_engine.subscribe(lambda name, doc: docs[name].append(doc))
 
-    RE(snapshot(_imaging_detector, _spectroscopy_detector, _sample_stage))
+    run_engine(snapshot(_imaging_detector, _spectroscopy_detector, _sample_stage))
 
     assert_emitted(
         docs, start=1, descriptor=1, stream_resource=2, stream_datum=2, event=1, stop=1
@@ -85,14 +85,14 @@ def test_snapshot(
 
 
 async def test_spectroscopy(
-    RE: RunEngine,
+    run_engine: RunEngine,
     _spectroscopy_detector: AravisDetector,
     _sample_stage: XYZStage,
 ):
     docs = defaultdict(list)
-    RE.subscribe(lambda name, doc: docs[name].append(doc))
+    run_engine.subscribe(lambda name, doc: docs[name].append(doc))
 
-    RE(
+    run_engine(
         spectroscopy(
             _spectroscopy_detector,
             _sample_stage,
@@ -121,14 +121,14 @@ async def test_spectroscopy(
 
 
 async def test_spectroscopy_defaults(
-    RE: RunEngine,
+    run_engine: RunEngine,
     _spectroscopy_detector: AravisDetector,
     _sample_stage: XYZStage,
 ):
     docs = defaultdict(list)
-    RE.subscribe(lambda name, doc: docs[name].append(doc))
+    run_engine.subscribe(lambda name, doc: docs[name].append(doc))
 
-    RE(spectroscopy(_spectroscopy_detector, _sample_stage))
+    run_engine(spectroscopy(_spectroscopy_detector, _sample_stage))
 
     assert await _spectroscopy_detector.driver.acquire_time.get_value() == 0.1
 
@@ -149,7 +149,9 @@ async def test_spectroscopy_defaults(
     }
 
 
-def test_spectroscopy_prepares_and_waits_before_doing_anything_else(RE: RunEngine):
+def test_spectroscopy_prepares_and_waits_before_doing_anything_else(
+    run_engine: RunEngine,
+):
     plan = spectroscopy()
     message_1, message_2 = next(plan), next(plan)
 
