@@ -7,11 +7,11 @@ from ophyd_async.core import StaticPathProvider, UUIDFilenameProvider
 
 
 @pytest.fixture(scope="function")
-def RE():
-    RE = RunEngine(call_returns_result=True)
-    yield RE
-    if RE.state not in ("idle", "panicked"):
-        RE.halt()
+def run_engine():
+    run_engine = RunEngine(call_returns_result=True)
+    yield run_engine
+    if run_engine.state not in ("idle", "panicked"):
+        run_engine.halt()
 
 
 @pytest.fixture(scope="session", autouse=True)
