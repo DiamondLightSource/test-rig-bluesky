@@ -11,12 +11,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 description = "Bluesky plans to be run on Diamond's test rigs e.g. ViSR, P45, etc"
-dependencies = [
-    "blueapi>=1.2.1",
-    "scanspec<=1.0a2",
-    "dls-dodal @ file:///workspaces/test-rig-bluesky/dodal",
-    "ophyd-async @ file:///workspaces/test-rig-bluesky/ophyd-async",
-]
+dependencies = ["blueapi>=1.2.1", "scanspec<=1.0a2"]
 dynamic = ["version"]
 license.file = "LICENSE"
 readme = "README.md"

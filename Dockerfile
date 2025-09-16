@@ -17,8 +17,7 @@ FROM developer AS build
 # Requires buildkit 0.17.0
 COPY . /workspaces/test-rig-bluesky
 WORKDIR /workspaces/test-rig-bluesky
-RUN chmod o+wrX .
-RUN touch dev-requirements.txt && pip install -c dev-requirements.txt .
+RUN chmod o+wrX . && touch dev-requirements.txt && pip install -c dev-requirements.txt . ./dodal ./ophyd-async[ca,pva]
 
 
 FROM build AS debug
