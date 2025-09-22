@@ -34,7 +34,7 @@ RUN sed -i 's/files/ldap files/g' /etc/nsswitch.conf
 
 # Make editable and debuggable
 RUN pip install debugpy
-RUN pip install -e .
+RUN pip install -e . ./dodal ./ophyd-async[ca,pva]
 
 # Alternate entrypoint to allow devcontainer to attach
 ENTRYPOINT [ "/bin/bash", "-c", "--" ]
