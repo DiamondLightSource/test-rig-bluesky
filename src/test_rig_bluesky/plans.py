@@ -1,4 +1,5 @@
 import math
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,11 +11,14 @@ from dodal.common import inject
 from dodal.devices.motors import XYZStage
 from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from dodal.plans import spec_scan
-from ophyd_async.core import TriggerInfo
+from ophyd_async.core import Device, TriggerInfo, YamlSettingsProvider
 from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.epics.adcore import NDAttributePv, NDAttributePvDbrType
 from ophyd_async.epics.adcore._core_io import NDROIStatNIO
-from ophyd_async.plan_stubs import setup_ndattributes
+from ophyd_async.plan_stubs import (
+    setup_ndattributes,
+    store_settings,
+)
 from scanspec.specs import Line, Spec
 
 imaging_detector = inject("imaging_detector")
@@ -29,6 +33,15 @@ class ROI:
     start_x: int
     start_y: int
     size: int
+
+
+def save_settings(
+    device: Device,
+    design_name: str,
+    design_directory: str = os.path.abspath("./src/test_rig_bluesky/"),
+) -> MsgGenerator[None]:
+    provider = YamlSettingsProvider(design_directory)
+    yield from store_settings(provider, design_name, device)
 
 
 @attach_data_session_metadata_decorator()
