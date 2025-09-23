@@ -1,4 +1,5 @@
 import asyncio
+import os
 import unittest.mock
 from collections import defaultdict
 
@@ -10,7 +11,12 @@ from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.testing import assert_emitted, callback_on_mock_put, set_mock_value
 from scanspec.specs import Line
 
-from test_rig_bluesky.plans import demo_spectroscopy, snapshot, spectroscopy
+from test_rig_bluesky.plans import (
+    demo_spectroscopy,
+    save_settings,
+    snapshot,
+    spectroscopy,
+)
 
 
 @pytest.fixture
@@ -59,6 +65,19 @@ def _mock_detector_behavior(detector: AravisDetector) -> None:
 
     set_mock_value(detector.fileio.file_path_exists, True)
     callback_on_mock_put(detector.driver.acquire, on_acquire)
+
+
+def test_save_settings(
+    run_engine: RunEngine,
+    _spectroscopy_detector: AravisDetector,
+):
+    run_engine(
+        save_settings(
+            _spectroscopy_detector, design_name="test", design_directory="/tmp"
+        )
+    )
+
+    assert os.path.isfile("/tmp/test.yaml")
 
 
 def test_snapshot(
