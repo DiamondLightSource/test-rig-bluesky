@@ -1,6 +1,5 @@
 import math
 import os
-from dataclasses import dataclass
 from typing import Any
 
 from bluesky import plan_stubs as bps
@@ -11,11 +10,14 @@ from dodal.common import inject
 from dodal.devices.motors import XYZStage
 from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from dodal.plans import spec_scan
-from ophyd_async.core import Device, TriggerInfo, YamlSettingsProvider
+from ophyd_async.core import Device, Settings, TriggerInfo, YamlSettingsProvider
 from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.epics.adcore import NDAttributePv, NDAttributePvDbrType
 from ophyd_async.epics.adcore._core_io import NDROIStatNIO
 from ophyd_async.plan_stubs import (
+    apply_settings,
+    apply_settings_if_different,
+    retrieve_settings,
     setup_ndattributes,
     store_settings,
 )
@@ -26,15 +28,6 @@ spectroscopy_detector = inject("spectroscopy_detector")
 sample_stage = inject("sample_stage")
 
 
-@dataclass
-class ROI:
-    channel: int
-    name: str
-    start_x: int
-    start_y: int
-    size: int
-
-
 def save_settings(
     device: Device,
     design_name: str,
@@ -42,6 +35,26 @@ def save_settings(
 ) -> MsgGenerator[None]:
     provider = YamlSettingsProvider(design_directory)
     yield from store_settings(provider, design_name, device)
+
+
+def load_settings(
+    device: Device,
+    design_name: str,
+    design_directory: str = os.path.abspath("./src/test_rig_bluesky/"),
+    whitelist_pvs: list[str] | None = None,
+) -> MsgGenerator[None]:
+    provider = YamlSettingsProvider(design_directory)
+    settings = yield from retrieve_settings(provider, design_name, device)
+    if whitelist_pvs is None:
+        settings_to_set = settings
+    else:
+        signal_values = {
+            signal: value
+            for signal, value in settings.items()
+            if signal.name.replace(f"{device.name}-", "") in whitelist_pvs
+        }
+        settings_to_set = Settings(settings.device, signal_values)
+    yield from apply_settings_if_different(settings_to_set, apply_settings)
 
 
 @attach_data_session_metadata_decorator()
@@ -65,49 +78,62 @@ def spectroscopy(
     yield from bps.prepare(
         spectroscopy_detector, TriggerInfo(livetime=exposure_time), wait=True
     )
-    # TODO: This would be nicer if NDArrayBaseIO had a PortName signal
-    yield from bps.abs_set(
-        spectroscopy_detector.fileio.nd_array_port, "D2.roistat", wait=True
+
+    yield from load_settings(
+        device=spectroscopy_detector,
+        design_name="spectroscopy_detector_baseline",
+        whitelist_pvs=[
+            "fileio.nd_array_port",
+            "roistat-channels-array_counter",
+            "roistat-channels-1-min_x",
+            "roistat-channels-1-min_y",
+            "roistat-channels-1-name_",
+            "roistat-channels-1-size_x",
+            "roistat-channels-1-size_y",
+            "roistat-channels-1-use",
+            "roistat-channels-2-min_x",
+            "roistat-channels-2-min_y",
+            "roistat-channels-2-name_",
+            "roistat-channels-2-size_x",
+            "roistat-channels-2-size_y",
+            "roistat-channels-2-use",
+            "roistat-channels-3-min_x",
+            "roistat-channels-3-min_y",
+            "roistat-channels-3-name_",
+            "roistat-channels-3-size_x",
+            "roistat-channels-3-size_y",
+            "roistat-channels-3-use",
+        ],
     )
 
-    rois = [
-        ROI(2, "Green", 880, 605, 150),
-        ROI(3, "Blue", 1665, 600, 150),
-        ROI(1, "Red", 95, 610, 150),
-    ]
-
     params: list[NDAttributePv] = []
-    for roi in rois:
-        roistatn = spectroscopy_detector.roistat.channels[roi.channel]  # type: ignore
+    for channel in list(spectroscopy_detector.roistat.channels.keys()):  # type: ignore
+        roistatn = spectroscopy_detector.roistat.channels[channel]  # type: ignore
         assert isinstance(roistatn, NDROIStatNIO)
 
-        yield from bps.mv(
-            *(roistatn.name_, roi.name),
-            *(roistatn.min_x, roi.start_x),
-            *(roistatn.min_y, roi.start_y),
-            *(roistatn.size_x, roi.size),
-            *(roistatn.size_y, roi.size),
-            *(roistatn.use, True),
-            wait=True,
-        )
+        channel_name = yield from bps.rd(roistatn.name_)
 
         params.append(
             NDAttributePv(
-                name=f"{roi.name}Total",
+                name=f"{channel_name}Total",
                 signal=roistatn.total,
                 dbrtype=NDAttributePvDbrType.DBR_LONG,
-                description=f"Sum of {roi.name} channel",
+                description=f"Sum of {channel_name} channel",
             )
         )
 
     yield from setup_ndattributes(spectroscopy_detector.roistat, params)  # type: ignore
 
-    for motor in [sample_stage.x, sample_stage.y]:
-        yield from bps.mv(
-            *(motor.acceleration_time, 0.001),
-            *(motor.velocity, 100),
-            wait=True,
-        )
+    yield from load_settings(
+        device=sample_stage,
+        design_name="sample_stage_baseline",
+        whitelist_pvs=[
+            "x-acceleration_time",
+            "x-velocity",
+            "y-acceleration_time",
+            "y-velocity",
+        ],
+    )
 
     spec = spec or Line(sample_stage.x, 0, 5, 5)
 
