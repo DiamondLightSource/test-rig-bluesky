@@ -13,6 +13,7 @@ from scanspec.specs import Line
 
 from test_rig_bluesky.plans import (
     demo_spectroscopy,
+    load_settings,
     save_settings,
     snapshot,
     spectroscopy,
@@ -78,6 +79,40 @@ def test_save_settings(
     )
 
     assert os.path.isfile("/tmp/test.yaml")
+
+
+async def test_load_subset_of_settings(
+    run_engine: RunEngine,
+    _spectroscopy_detector: AravisDetector,
+):
+    run_engine(
+        load_settings(
+            _spectroscopy_detector,
+            design_name="test_settings",
+            design_directory=os.path.abspath("./tests/unit_tests/"),
+            whitelist_pvs=["driver-acquire_time"],
+        )
+    )
+
+    assert await _spectroscopy_detector.driver.acquire_time.get_value() == 0.5
+    assert await _spectroscopy_detector.roistat.channels[1].min_x.get_value() == 0  # type:ignore
+
+
+async def test_load_settings(
+    run_engine: RunEngine,
+    _spectroscopy_detector: AravisDetector,
+):
+    run_engine(
+        load_settings(
+            _spectroscopy_detector,
+            design_name="test_settings",
+            design_directory=os.path.abspath("./tests/unit_tests/"),
+        )
+    )
+
+    assert await _spectroscopy_detector.driver.acquire_period.get_value() == 1.0
+    assert await _spectroscopy_detector.driver.num_images.get_value() == 2
+    assert await _spectroscopy_detector.roistat.channels[1].min_x.get_value() == 95  # type:ignore
 
 
 def test_snapshot(
