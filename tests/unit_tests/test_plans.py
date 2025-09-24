@@ -1,7 +1,7 @@
 import asyncio
-import os
 import unittest.mock
 from collections import defaultdict
+from unittest.mock import ANY, AsyncMock, Mock, patch
 
 import pytest
 from bluesky import RunEngine
@@ -68,17 +68,16 @@ def _mock_detector_behavior(detector: AravisDetector) -> None:
     callback_on_mock_put(detector.driver.acquire, on_acquire)
 
 
-def test_save_settings(
+@patch("test_rig_bluesky.plans.YamlSettingsProvider")
+def test_save_setting(
+    mock_provider: Mock,
     run_engine: RunEngine,
     _spectroscopy_detector: AravisDetector,
 ):
-    run_engine(
-        save_settings(
-            _spectroscopy_detector, design_name="test", design_directory="/tmp"
-        )
-    )
-
-    assert os.path.isfile("/tmp/test.yaml")
+    # Provider needs to be async or the RunEngine will complain
+    mock_provider.return_value = AsyncMock()
+    run_engine(save_settings(_spectroscopy_detector, design_name="test"))
+    mock_provider.return_value.store.assert_called_once_with("test", ANY)
 
 
 async def test_load_subset_of_settings(
@@ -88,13 +87,12 @@ async def test_load_subset_of_settings(
     run_engine(
         load_settings(
             _spectroscopy_detector,
-            design_name="test_settings",
-            design_directory=os.path.abspath("./tests/unit_tests/"),
+            design_name="spectroscopy_detector_baseline",
             whitelist_pvs=["driver-acquire_time"],
         )
     )
 
-    assert await _spectroscopy_detector.driver.acquire_time.get_value() == 0.5
+    assert await _spectroscopy_detector.driver.acquire_time.get_value() == 0.1
     assert await _spectroscopy_detector.roistat.channels[1].min_x.get_value() == 0  # type:ignore
 
 
@@ -105,13 +103,12 @@ async def test_load_settings(
     run_engine(
         load_settings(
             _spectroscopy_detector,
-            design_name="test_settings",
-            design_directory=os.path.abspath("./tests/unit_tests/"),
+            design_name="spectroscopy_detector_baseline",
         )
     )
 
-    assert await _spectroscopy_detector.driver.acquire_period.get_value() == 1.0
-    assert await _spectroscopy_detector.driver.num_images.get_value() == 2
+    assert await _spectroscopy_detector.driver.acquire_period.get_value() == 0.021815
+    assert await _spectroscopy_detector.driver.num_images.get_value() == 1
     assert await _spectroscopy_detector.roistat.channels[1].min_x.get_value() == 95  # type:ignore
 
 
