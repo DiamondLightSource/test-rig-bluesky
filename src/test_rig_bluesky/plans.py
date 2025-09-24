@@ -75,18 +75,6 @@ def spectroscopy(
     metadata: dict[str, Any] | None = None,
 ) -> MsgGenerator[None]:
     """Do a spectroscopy scan."""
-    # We call mv instead of prepare because prepare cannot technically be used
-    # outside of a run.
-    # See: https://github.com/DiamondLightSource/blueapi/issues/1211
-    #
-    # Deadtime taken from
-    # https://github.com/bluesky/ophyd-async/blob/15fa34b6ea2a28e2f27265a5564c9ee36423f1b7/src/ophyd_async/epics/adaravis/_aravis_controller.py#L11
-    yield from bps.mv(
-        *(spectroscopy_detector.driver.acquire_time, exposure_time),
-        *(spectroscopy_detector.driver.acquire_period, exposure_time + 1961e-6),
-        wait=True,
-    )
-
     yield from load_settings(
         device=spectroscopy_detector,
         design_name="spectroscopy_detector_baseline",
@@ -112,6 +100,18 @@ def spectroscopy(
             "roistat-channels-3-size_y",
             "roistat-channels-3-use",
         ],
+    )
+
+    # We call mv instead of prepare because prepare cannot technically be used
+    # outside of a run.
+    # See: https://github.com/DiamondLightSource/blueapi/issues/1211
+    #
+    # Deadtime taken from
+    # https://github.com/bluesky/ophyd-async/blob/15fa34b6ea2a28e2f27265a5564c9ee36423f1b7/src/ophyd_async/epics/adaravis/_aravis_controller.py#L11
+    yield from bps.mv(
+        *(spectroscopy_detector.driver.acquire_time, exposure_time),
+        *(spectroscopy_detector.driver.acquire_period, exposure_time + 1961e-6),
+        wait=True,
     )
 
     params: list[NDAttributePv] = []
