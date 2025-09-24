@@ -10,7 +10,7 @@ from dodal.common import inject
 from dodal.devices.motors import XYZStage
 from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from dodal.plans import spec_scan
-from ophyd_async.core import Device, Settings, TriggerInfo, YamlSettingsProvider
+from ophyd_async.core import Device, Settings, YamlSettingsProvider
 from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.epics.adcore import NDAttributePv, NDAttributePvDbrType
 from ophyd_async.epics.adcore._core_io import NDROIStatNIO
@@ -75,8 +75,16 @@ def spectroscopy(
     metadata: dict[str, Any] | None = None,
 ) -> MsgGenerator[None]:
     """Do a spectroscopy scan."""
-    yield from bps.prepare(
-        spectroscopy_detector, TriggerInfo(livetime=exposure_time), wait=True
+    # We call mv instead of prepare because prepare cannot technically be used
+    # outside of a run.
+    # See: https://github.com/DiamondLightSource/blueapi/issues/1211
+    #
+    # Deadtime taken from
+    # https://github.com/bluesky/ophyd-async/blob/15fa34b6ea2a28e2f27265a5564c9ee36423f1b7/src/ophyd_async/epics/adaravis/_aravis_controller.py#L11
+    yield from bps.mv(
+        *(spectroscopy_detector.driver.acquire_time, exposure_time),
+        *(spectroscopy_detector.driver.acquire_period, exposure_time + 1961e-6),
+        wait=True,
     )
 
     yield from load_settings(

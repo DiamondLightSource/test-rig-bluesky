@@ -203,14 +203,16 @@ async def test_spectroscopy_defaults(
     }
 
 
-def test_spectroscopy_prepares_and_waits_before_doing_anything_else(
+def test_spectroscopy_sets_exposure_time_and_acquire_period_before_doing_anything_else(
     run_engine: RunEngine,
+    _spectroscopy_detector: AravisDetector,
 ):
-    plan = spectroscopy()
-    message_1, message_2 = next(plan), next(plan)
+    plan = spectroscopy(_spectroscopy_detector)
+    message_1, message_2, message_3 = next(plan), next(plan), next(plan)
 
-    assert message_1.command == "prepare"
-    assert message_2.command == "wait"
+    assert message_1.command == "set"
+    assert message_2.command == "set"
+    assert message_3.command == "wait"
 
 
 def test_demo_spectroscopy():
