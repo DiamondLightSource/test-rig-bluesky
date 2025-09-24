@@ -1,5 +1,5 @@
 import math
-import os
+from pathlib import Path
 from typing import Any
 
 from bluesky import plan_stubs as bps
@@ -10,7 +10,7 @@ from dodal.common import inject
 from dodal.devices.motors import XYZStage
 from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from dodal.plans import spec_scan
-from ophyd_async.core import Device, Settings, YamlSettingsProvider
+from ophyd_async.core import Device, Settings, SettingsProvider, YamlSettingsProvider
 from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.epics.adcore import NDAttributePv, NDAttributePvDbrType
 from ophyd_async.epics.adcore._core_io import NDROIStatNIO
@@ -31,19 +31,17 @@ sample_stage = inject("sample_stage")
 def save_settings(
     device: Device,
     design_name: str,
-    design_directory: str = os.path.abspath("./src/test_rig_bluesky/"),
 ) -> MsgGenerator[None]:
-    provider = YamlSettingsProvider(design_directory)
+    provider = _settings_provider()
     yield from store_settings(provider, design_name, device)
 
 
 def load_settings(
     device: Device,
     design_name: str,
-    design_directory: str = os.path.abspath("./src/test_rig_bluesky/"),
     whitelist_pvs: list[str] | None = None,
 ) -> MsgGenerator[None]:
-    provider = YamlSettingsProvider(design_directory)
+    provider = _settings_provider()
     settings = yield from retrieve_settings(provider, design_name, device)
     if whitelist_pvs is None:
         settings_to_set = settings
@@ -55,6 +53,11 @@ def load_settings(
         }
         settings_to_set = Settings(settings.device, signal_values)
     yield from apply_settings_if_different(settings_to_set, apply_settings)
+
+
+def _settings_provider() -> SettingsProvider:
+    this_directory = Path(__file__).parent
+    return YamlSettingsProvider(this_directory)
 
 
 @attach_data_session_metadata_decorator()
