@@ -3,9 +3,9 @@ import unittest.mock
 from collections import defaultdict
 from unittest.mock import ANY, AsyncMock, Mock, patch
 
+import dodal.beamlines.b01_1 as b01_1
 import pytest
 from bluesky import RunEngine
-from dodal.beamlines.b01_1 import imaging_detector, sample_stage, spectroscopy_detector
 from dodal.devices.motors import XYZStage
 from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.testing import assert_emitted, callback_on_mock_put, set_mock_value
@@ -21,22 +21,22 @@ from test_rig_bluesky.plans import (
 
 
 @pytest.fixture
-def _imaging_detector() -> AravisDetector:
-    det = imaging_detector(connect_immediately=True, mock=True)
+def imaging_detector() -> AravisDetector:
+    det = b01_1.imaging_detector(connect_immediately=True, mock=True)
     _mock_detector_behavior(det)
     return det
 
 
 @pytest.fixture
-def _spectroscopy_detector() -> AravisDetector:
-    det = spectroscopy_detector(connect_immediately=True, mock=True)
+def spectroscopy_detector() -> AravisDetector:
+    det = b01_1.spectroscopy_detector(connect_immediately=True, mock=True)
     _mock_detector_behavior(det)
     return det
 
 
 @pytest.fixture
-def _sample_stage() -> XYZStage:
-    stage = sample_stage(connect_immediately=True, mock=True)
+def sample_stage() -> XYZStage:
+    stage = b01_1.sample_stage(connect_immediately=True, mock=True)
 
     set_mock_value(stage.x.low_limit_travel, -10.0)
     set_mock_value(stage.x.high_limit_travel, 10.0)
@@ -72,56 +72,56 @@ def _mock_detector_behavior(detector: AravisDetector) -> None:
 def test_save_setting(
     mock_provider: Mock,
     run_engine: RunEngine,
-    _spectroscopy_detector: AravisDetector,
+    spectroscopy_detector: AravisDetector,
 ):
     # Provider needs to be async or the RunEngine will complain
     mock_provider.return_value = AsyncMock()
-    run_engine(save_settings(_spectroscopy_detector, design_name="test"))
+    run_engine(save_settings(spectroscopy_detector, design_name="test"))
     mock_provider.return_value.store.assert_called_once_with("test", ANY)
 
 
 async def test_load_subset_of_settings(
     run_engine: RunEngine,
-    _spectroscopy_detector: AravisDetector,
+    spectroscopy_detector: AravisDetector,
 ):
     run_engine(
         load_settings(
-            _spectroscopy_detector,
+            spectroscopy_detector,
             design_name="spectroscopy_detector_baseline",
             whitelist_pvs=["driver-acquire_time"],
         )
     )
 
-    assert await _spectroscopy_detector.driver.acquire_time.get_value() == 0.1
-    assert await _spectroscopy_detector.roistat.channels[1].min_x.get_value() == 0  # type:ignore
+    assert await spectroscopy_detector.driver.acquire_time.get_value() == 0.1
+    assert await spectroscopy_detector.roistat.channels[1].min_x.get_value() == 0  # type:ignore
 
 
 async def test_load_settings(
     run_engine: RunEngine,
-    _spectroscopy_detector: AravisDetector,
+    spectroscopy_detector: AravisDetector,
 ):
     run_engine(
         load_settings(
-            _spectroscopy_detector,
+            spectroscopy_detector,
             design_name="spectroscopy_detector_baseline",
         )
     )
 
-    assert await _spectroscopy_detector.driver.acquire_period.get_value() == 0.021815
-    assert await _spectroscopy_detector.driver.num_images.get_value() == 1
-    assert await _spectroscopy_detector.roistat.channels[1].min_x.get_value() == 95  # type:ignore
+    assert await spectroscopy_detector.driver.acquire_period.get_value() == 0.021815
+    assert await spectroscopy_detector.driver.num_images.get_value() == 1
+    assert await spectroscopy_detector.roistat.channels[1].min_x.get_value() == 95  # type:ignore
 
 
 def test_snapshot(
     run_engine: RunEngine,
-    _imaging_detector: AravisDetector,
-    _spectroscopy_detector: AravisDetector,
-    _sample_stage: XYZStage,
+    imaging_detector: AravisDetector,
+    spectroscopy_detector: AravisDetector,
+    sample_stage: XYZStage,
 ):
     docs = defaultdict(list)
     run_engine.subscribe(lambda name, doc: docs[name].append(doc))
 
-    run_engine(snapshot(_imaging_detector, _spectroscopy_detector, _sample_stage))
+    run_engine(snapshot(imaging_detector, spectroscopy_detector, sample_stage))
 
     assert_emitted(
         docs, start=1, descriptor=1, stream_resource=2, stream_datum=2, event=1, stop=1
@@ -137,22 +137,22 @@ def test_snapshot(
 
 async def test_spectroscopy(
     run_engine: RunEngine,
-    _spectroscopy_detector: AravisDetector,
-    _sample_stage: XYZStage,
+    spectroscopy_detector: AravisDetector,
+    sample_stage: XYZStage,
 ):
     docs = defaultdict(list)
     run_engine.subscribe(lambda name, doc: docs[name].append(doc))
 
     run_engine(
         spectroscopy(
-            _spectroscopy_detector,
-            _sample_stage,
-            Line(_sample_stage.y, 4.2, 6, 3) * Line(_sample_stage.x, 0, 5, 10),
+            spectroscopy_detector,
+            sample_stage,
+            Line(sample_stage.y, 4.2, 6, 3) * Line(sample_stage.x, 0, 5, 10),
             0.2,
         )
     )
 
-    assert await _spectroscopy_detector.driver.acquire_time.get_value() == 0.2
+    assert await spectroscopy_detector.driver.acquire_time.get_value() == 0.2
 
     assert_emitted(
         docs,
@@ -167,15 +167,15 @@ async def test_spectroscopy(
 
 async def test_spectroscopy_defaults(
     run_engine: RunEngine,
-    _spectroscopy_detector: AravisDetector,
-    _sample_stage: XYZStage,
+    spectroscopy_detector: AravisDetector,
+    sample_stage: XYZStage,
 ):
     docs = defaultdict(list)
     run_engine.subscribe(lambda name, doc: docs[name].append(doc))
 
-    run_engine(spectroscopy(_spectroscopy_detector, _sample_stage))
+    run_engine(spectroscopy(spectroscopy_detector, sample_stage))
 
-    assert await _spectroscopy_detector.driver.acquire_time.get_value() == 0.1
+    assert await spectroscopy_detector.driver.acquire_time.get_value() == 0.1
 
     assert_emitted(
         docs,
@@ -190,13 +190,13 @@ async def test_spectroscopy_defaults(
 
 def test_spectroscopy_datasets(
     run_engine: RunEngine,
-    _spectroscopy_detector: AravisDetector,
-    _sample_stage: XYZStage,
+    spectroscopy_detector: AravisDetector,
+    sample_stage: XYZStage,
 ):
     docs = defaultdict(list)
     run_engine.subscribe(lambda name, doc: docs[name].append(doc))
 
-    run_engine(spectroscopy(_spectroscopy_detector, _sample_stage))
+    run_engine(spectroscopy(spectroscopy_detector, sample_stage))
 
     data_keys = [resource.get("data_key") for resource in docs["stream_resource"]]
     assert data_keys == ["spectroscopy_detector", "RedTotal", "GreenTotal", "BlueTotal"]
@@ -209,13 +209,13 @@ def test_spectroscopy_datasets(
 
 async def test_spectroscopy_sets_exposure_time_and_acquire_period(
     run_engine: RunEngine,
-    _spectroscopy_detector: AravisDetector,
-    _sample_stage: XYZStage,
+    spectroscopy_detector: AravisDetector,
+    sample_stage: XYZStage,
 ):
-    run_engine(spectroscopy(_spectroscopy_detector, _sample_stage, exposure_time=1.0))
-    assert await _spectroscopy_detector.driver.acquire_time.get_value() == 1.0
+    run_engine(spectroscopy(spectroscopy_detector, sample_stage, exposure_time=1.0))
+    assert await spectroscopy_detector.driver.acquire_time.get_value() == 1.0
     assert (
-        await _spectroscopy_detector.driver.acquire_period.get_value() == 1.0 + 1961e-6
+        await spectroscopy_detector.driver.acquire_period.get_value() == 1.0 + 1961e-6
     )
 
 

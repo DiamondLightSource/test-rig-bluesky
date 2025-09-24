@@ -1,7 +1,7 @@
+import dodal.beamlines.b01_1 as b01_1
 import pytest
 from blueapi.service.model import TaskRequest
 from bluesky import RunEngine
-from dodal.beamlines.b01_1 import sample_stage, spectroscopy_detector
 from scanspec.specs import Line
 
 from test_rig_bluesky.plans import spectroscopy
@@ -121,9 +121,9 @@ def test_generic_scan(
 @pytest.mark.control_system
 def test_spectroscopy_re():
     run_engine = RunEngine()
-    _spectroscopy_detector = spectroscopy_detector(connect_immediately=True)
-    _sample_stage = sample_stage(connect_immediately=True)
+    spectroscopy_detector = b01_1.spectroscopy_detector(connect_immediately=True)
+    sample_stage = b01_1.sample_stage(connect_immediately=True)
 
-    scan_spec = Line(_sample_stage.y, 0, 5, 50) * Line(_sample_stage.x, 2, 5, 30)
+    scan_spec = Line(sample_stage.y, 0, 5, 50) * Line(sample_stage.x, 2, 5, 30)
 
-    run_engine(spectroscopy(_spectroscopy_detector, _sample_stage, scan_spec))
+    run_engine(spectroscopy(spectroscopy_detector, sample_stage, scan_spec))
