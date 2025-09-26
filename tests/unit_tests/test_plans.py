@@ -163,12 +163,6 @@ async def test_spectroscopy(
         event=30,
         stop=1,
     )
-    assert docs["stream_resource"][0].get("data_key") == "spectroscopy_detector"
-    assert docs["event"][0]["data"] == {
-        "sample_stage-x": 0.0,
-        "sample_stage-y": 0.0,
-        "sample_stage-z": 0.0,
-    }
 
 
 async def test_spectroscopy_defaults(
@@ -192,7 +186,20 @@ async def test_spectroscopy_defaults(
         event=5,
         stop=1,
     )
-    assert docs["stream_resource"][0].get("data_key") == "spectroscopy_detector"
+
+
+def test_spectroscopy_datasets(
+    run_engine: RunEngine,
+    _spectroscopy_detector: AravisDetector,
+    _sample_stage: XYZStage,
+):
+    docs = defaultdict(list)
+    run_engine.subscribe(lambda name, doc: docs[name].append(doc))
+
+    run_engine(spectroscopy(_spectroscopy_detector, _sample_stage))
+
+    data_keys = [resource.get("data_key") for resource in docs["stream_resource"]]
+    assert data_keys == ["spectroscopy_detector", "RedTotal", "GreenTotal", "BlueTotal"]
     assert docs["event"][0]["data"] == {
         "sample_stage-x": 0.0,
         "sample_stage-y": 0.0,
