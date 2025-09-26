@@ -12,7 +12,10 @@ from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from dodal.plans import spec_scan
 from ophyd_async.core import Device, Settings, SettingsProvider, YamlSettingsProvider
 from ophyd_async.epics.adaravis import AravisDetector
-from ophyd_async.epics.adcore import NDAttributePv, NDAttributePvDbrType
+from ophyd_async.epics.adcore import (
+    NDAttributeDataType,
+    NDAttributeParam,
+)
 from ophyd_async.epics.adcore._core_io import NDROIStatNIO
 from ophyd_async.plan_stubs import (
     apply_settings,
@@ -117,7 +120,7 @@ def spectroscopy(
         wait=True,
     )
 
-    params: list[NDAttributePv] = []
+    params: list[NDAttributeParam] = []
     for channel in list(spectroscopy_detector.roistat.channels.keys()):  # type: ignore
         roistatn = spectroscopy_detector.roistat.channels[channel]  # type: ignore
         assert isinstance(roistatn, NDROIStatNIO)
@@ -125,10 +128,11 @@ def spectroscopy(
         channel_name = yield from bps.rd(roistatn.name_)
 
         params.append(
-            NDAttributePv(
+            NDAttributeParam(
                 name=f"{channel_name}Total",
-                signal=roistatn.total,
-                dbrtype=NDAttributePvDbrType.DBR_LONG,
+                param="ROISTAT_TOTAL",
+                datatype=NDAttributeDataType.DOUBLE,
+                addr=channel,
                 description=f"Sum of {channel_name} channel",
             )
         )
