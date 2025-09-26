@@ -32,6 +32,25 @@ jobs:
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+  container:
+    needs: test
+    if: always()
+    uses: ./.github/workflows/_container.yml
+    with:
+      publish: ${{ needs.test.result == 'success' }}
+    permissions:
+      contents: read
+      packages: write
+
+  debug_container:
+    needs: [container, test]
+    uses: ./.github/workflows/_debug_container.yml
+    with:
+      publish: ${{ needs.test.result == 'success' }}
+    permissions:
+      contents: read
+      packages: write
+
   dist:
     uses: ./.github/workflows/_dist.yml
   
