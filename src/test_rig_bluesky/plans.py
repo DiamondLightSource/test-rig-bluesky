@@ -20,11 +20,12 @@ from ophyd_async.epics.adcore._core_io import NDROIStatNIO
 from ophyd_async.plan_stubs import (
     apply_settings,
     apply_settings_if_different,
+    ensure_connected,
     retrieve_settings,
     setup_ndattributes,
     store_settings,
 )
-from scanspec.specs import Line, Spec
+from scanspec.specs import Fly, Line, Spec
 
 imaging_detector = inject("imaging_detector")
 spectroscopy_detector = inject("spectroscopy_detector")
@@ -184,3 +185,35 @@ def demo_spectroscopy(
         exposure_time=exposure_time,
         metadata=metadata,
     )
+
+
+from ophyd_async.core import StandardFlyer
+from ophyd_async.epics.pmac import PmacTrajectoryTriggerLogic
+
+
+def spectroscopy_flyscan():
+    import bluesky.preprocessors as bpp
+    from dodal.beamlines import b01_1
+
+    stage = b01_1.sample_stage()
+    pmac = b01_1.pmac()
+    yield from ensure_connected(pmac, stage)
+
+    # Prepare motor info using trajectory scanning
+    spec = Fly(float(3) @ (Line(stage.y, 1, 2, 3) * ~Line(stage.x, 1, 5, 5)))
+    pmac_trajectory = PmacTrajectoryTriggerLogic(pmac)
+    pmac_trajectory_flyer = StandardFlyer(pmac_trajectory)
+
+    @attach_data_session_metadata_decorator()
+    @bpp.run_decorator()
+    @bpp.stage_decorator([pmac])
+    def inner_plan():
+        # Prepare pmac with the trajectory
+        yield from bps.prepare(pmac_trajectory_flyer, spec, wait=True)
+
+        # kickoff devices waiting for all of them
+        yield from bps.kickoff(pmac_trajectory_flyer, wait=True)
+
+        yield from bps.complete_all(pmac_trajectory_flyer, wait=True)
+
+    yield from inner_plan()
