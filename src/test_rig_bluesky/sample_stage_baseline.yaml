@@ -5,7 +5,7 @@ x.offset: 0.0
 x.offset_freeze_switch: Variable
 x.set_use_switch: Use
 x.user_setpoint: 5.00004
-x.velocity: 100.0
+x.velocity: 1.0
 y.acceleration_time: 0.001
 y.high_limit_travel: 14.5
 y.low_limit_travel: -14.5
@@ -13,7 +13,7 @@ y.offset: 0.0
 y.offset_freeze_switch: Variable
 y.set_use_switch: Use
 y.user_setpoint: 4.99999
-y.velocity: 100.0
+y.velocity: 1.0
 z.acceleration_time: 0.5
 z.high_limit_travel: 14.5
 z.low_limit_travel: -14.5
@@ -21,4 +21,4 @@ z.offset: 0.0
 z.offset_freeze_switch: Variable
 z.set_use_switch: Use
 z.user_setpoint: 7.000030000000001
-z.velocity: 50.0
+z.velocity: 1.0
