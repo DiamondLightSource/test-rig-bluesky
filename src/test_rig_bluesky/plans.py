@@ -85,7 +85,7 @@ def spectroscopy(
         device=spectroscopy_detector,
         design_name="spectroscopy_detector_baseline",
         whitelist_pvs=[
-            "fileio.nd_array_port",
+            "fileio-nd_array_port",
             "roistat-channels-array_counter",
             "roistat-channels-1-min_x",
             "roistat-channels-1-min_y",
