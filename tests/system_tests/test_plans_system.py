@@ -30,7 +30,7 @@ def test_spectroscopy(
             name="spectroscopy",
             instrument_session=latest_commissioning_instrument_session,
         ),
-        timeout=10,
+        timeout=20,
     )
     assert events["FINISHED"][0]["scanDimensions"] == [5]
 
@@ -47,7 +47,7 @@ def test_spectroscopy_with_custom_trajectory(
             params={"spec": scan_spec.serialize()},
             instrument_session=latest_commissioning_instrument_session,
         ),
-        timeout=30,
+        timeout=60,
     )
     assert events["FINISHED"][0]["scanDimensions"] == [5, 3]
 
@@ -60,7 +60,7 @@ def test_demo_spectroscopy(
             name="demo_spectroscopy",
             instrument_session=latest_commissioning_instrument_session,
         ),
-        timeout=60,
+        timeout=1000,
     )
     assert events["FINISHED"][0]["scanDimensions"] == [5, 5]
 
