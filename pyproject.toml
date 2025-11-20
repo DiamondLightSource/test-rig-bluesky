@@ -23,7 +23,7 @@ dev = [
     "copier",
     "pipdeptree",
     "pre-commit",
-    "pyright",
+    "pyright==1.1.406",
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
