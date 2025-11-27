@@ -132,7 +132,7 @@ def spectroscopy(
                 name=f"{channel_name}Total",
                 param="ROISTAT_TOTAL",
                 datatype=NDAttributeDataType.DOUBLE,
-                addr=channel,
+                addr=channel - 1,
                 description=f"Sum of {channel_name} channel",
             )
         )
