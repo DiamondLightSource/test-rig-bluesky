@@ -7,8 +7,9 @@ import dodal.beamlines.b01_1 as b01_1
 import pytest
 from bluesky import RunEngine
 from dodal.devices.motors import XYZStage
+from ophyd_async.core import callback_on_mock_put, set_mock_value
 from ophyd_async.epics.adaravis import AravisDetector
-from ophyd_async.testing import assert_emitted, callback_on_mock_put, set_mock_value
+from ophyd_async.testing import assert_emitted
 from scanspec.specs import Line
 
 from test_rig_bluesky.plans import (
