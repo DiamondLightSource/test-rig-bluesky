@@ -87,6 +87,7 @@ def spectroscopy(
         whitelist_pvs=[
             "fileio-nd_array_port",
             "fileio-enable_callbacks",
+            "driver-acquire",
             "driver-trigger_mode",
             "driver-trigger_source",
             "roistat-channels-array_counter",
@@ -108,6 +109,7 @@ def spectroscopy(
             "roistat-channels-3-size_x",
             "roistat-channels-3-size_y",
             "roistat-channels-3-use",
+            "roistat-nd_array_port",
             "roistat-enable_callbacks",
         ],
     )
