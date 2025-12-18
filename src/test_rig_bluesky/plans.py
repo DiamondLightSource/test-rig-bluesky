@@ -190,7 +190,40 @@ def spectroscopy_fly(
     spec: Spec[Movable] | None = None,
     exposure_time: float = 0.1,
     metadata: dict[str, Any] | None = None,
-):
+) -> MsgGenerator[None]:
+    yield from load_settings(
+        device=spectroscopy_detector,
+        design_name="spectroscopy_detector_baseline",
+        whitelist_pvs=[
+            "fileio-nd_array_port",
+            "fileio-enable_callbacks",
+            "driver-acquire",
+            "driver-trigger_mode",
+            "driver-trigger_source",
+            "roistat-channels-array_counter",
+            "roistat-channels-1-min_x",
+            "roistat-channels-1-min_y",
+            "roistat-channels-1-name_",
+            "roistat-channels-1-size_x",
+            "roistat-channels-1-size_y",
+            "roistat-channels-1-use",
+            "roistat-channels-2-min_x",
+            "roistat-channels-2-min_y",
+            "roistat-channels-2-name_",
+            "roistat-channels-2-size_x",
+            "roistat-channels-2-size_y",
+            "roistat-channels-2-use",
+            "roistat-channels-3-min_x",
+            "roistat-channels-3-min_y",
+            "roistat-channels-3-name_",
+            "roistat-channels-3-size_x",
+            "roistat-channels-3-size_y",
+            "roistat-channels-3-use",
+            "roistat-nd_array_port",
+            "roistat-enable_callbacks",
+        ],
+    )
+
     # Prepare motor info using trajectory scanning
     scan_frame_duration = 0.1
     num_x = 2
@@ -303,7 +336,7 @@ def demo_spectroscopy(
     The time taken to scan is approximately linear in total_numbers_of_grid_points.
     All other parameters can be left at their defaults.
     """
-    if True:
+    if False:
         xsteps = ysteps = int(round(math.sqrt(max(total_number_of_scan_points, 1))))
         xmin = grid_origin_x
         xmax = grid_origin_x + grid_size
