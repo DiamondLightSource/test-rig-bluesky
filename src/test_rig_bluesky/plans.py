@@ -39,6 +39,7 @@ from ophyd_async.fastcs.panda import (
 from ophyd_async.plan_stubs import (
     apply_settings,
     apply_settings_if_different,
+    ensure_connected,
     retrieve_settings,
     setup_ndattributes,
     store_settings,
@@ -185,19 +186,27 @@ def spectroscopy(
 def spectroscopy_fly(
     spectroscopy_detector: AravisDetector = spectroscopy_detector,
     sample_stage: XYZStage = sample_stage,
-    pmac: PmacIO = pmac,
+    # pmac: PmacIO = pmac,
     pandabox: HDFPanda = pandabox,
     spec: Spec[Movable] | None = None,
     exposure_time: float = 0.1,
     metadata: dict[str, Any] | None = None,
 ) -> MsgGenerator[None]:
+    pmac = PmacIO(
+        "BL01C-MO-PPMAC-01:",
+        raw_motors=[sample_stage.z, sample_stage.x],
+        coord_nums=[1],
+    )
+
+    yield from ensure_connected(pmac)
+
     # Prepare motor info using trajectory scanning
     scan_frame_duration = 0.1
     num_x = 100
     num_y = 40
     spec = spec or Fly(
         scan_frame_duration
-        @ (Line(sample_stage.y, 0, 5, num_y) * ~Line(sample_stage.x, 0, 1, num_x))  # type: ignore
+        @ (Line(sample_stage.z, 0, 5, num_y) * ~Line(sample_stage.x, 0, 1, num_x))  # type: ignore
     )
 
     detector_deadtime = 2e-3 * 1.01
@@ -290,7 +299,7 @@ def spectroscopy_fly(
 def demo_spectroscopy(
     spectroscopy_detector: AravisDetector = spectroscopy_detector,
     sample_stage: XYZStage = sample_stage,
-    pmac: PmacIO = pmac,
+    # pmac: PmacIO = pmac,
     pandabox: HDFPanda = pandabox,
     total_number_of_scan_points: int = 25,
     grid_size: float = 5.0,
@@ -323,7 +332,7 @@ def demo_spectroscopy(
         yield from spectroscopy_fly(
             spectroscopy_detector=spectroscopy_detector,
             sample_stage=sample_stage,
-            pmac=pmac,
+            # pmac=pmac,
             pandabox=pandabox,
             spec=None,
             exposure_time=exposure_time,
