@@ -303,7 +303,7 @@ def demo_spectroscopy(
     The time taken to scan is approximately linear in total_numbers_of_grid_points.
     All other parameters can be left at their defaults.
     """
-    if True:
+    if False:
         xsteps = ysteps = int(round(math.sqrt(max(total_number_of_scan_points, 1))))
         xmin = grid_origin_x
         xmax = grid_origin_x + grid_size
