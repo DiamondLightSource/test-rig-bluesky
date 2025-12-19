@@ -253,7 +253,7 @@ def spectroscopy_fly(
     yield from ensure_connected(pmac)
 
     # Prepare motor info using trajectory scanning
-    scan_frame_duration = 0.3
+    scan_frame_duration = 0.01
     num_x = 100
     num_y = 40
     spec = spec or Fly(
