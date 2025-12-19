@@ -246,7 +246,7 @@ def spectroscopy_fly(
 
     pmac = PmacIO(
         "BL01C-MO-PPMAC-01:",
-        raw_motors=[sample_stage.z, sample_stage.x],
+        raw_motors=[sample_stage.y, sample_stage.x],
         coord_nums=[1],
     )
 
@@ -258,7 +258,7 @@ def spectroscopy_fly(
     num_y = 40
     spec = spec or Fly(
         scan_frame_duration
-        @ (Line(sample_stage.z, 0, 5, num_y) * ~Line(sample_stage.x, 0, 1, num_x))  # type: ignore
+        @ (Line(sample_stage.y, 0, 1, num_y) * ~Line(sample_stage.x, 0, 1, num_x))  # type: ignore
     )
 
     detector_deadtime = 2e-3 * 1.01
