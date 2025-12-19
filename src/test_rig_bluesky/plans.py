@@ -226,7 +226,7 @@ def spectroscopy_fly(
     )
 
     params: list[NDAttributeParam] = []
-    for channel in list(spectroscopy_detector.roistat.channels.keys()):
+    for channel in list(spectroscopy_detector.roistat.channels.keys()):  # type: ignore
         roistatn = spectroscopy_detector.roistat.channels[channel]  # type: ignore
         assert isinstance(roistatn, NDROIStatNIO)
 
@@ -242,7 +242,7 @@ def spectroscopy_fly(
             )
         )
 
-    yield from setup_ndattributes(spectroscopy_detector.roistat, params)
+    yield from setup_ndattributes(spectroscopy_detector.roistat, params)  # type: ignore
 
     pmac = PmacIO(
         "BL01C-MO-PPMAC-01:",
@@ -265,8 +265,7 @@ def spectroscopy_fly(
     total = num_x * num_y
 
     trigger_logic = spec
-    pmac_trajectory = PmacTrajectoryTriggerLogic(pmac)
-    pmac_trajectory_flyer = StandardFlyer(pmac_trajectory)
+    pmac_trajectory_flyer = PmacTrajectoryTriggerLogic(pmac)
     table: SeqBlock = pandabox.seq.__1  # type: ignore # noqa: SLF001
 
     scan_spec_info = ScanSpecInfo(spec=spec, deadtime=detector_deadtime)
