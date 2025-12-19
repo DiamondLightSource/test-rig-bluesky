@@ -343,6 +343,7 @@ def spectroscopy_fly(
                 spectroscopy_detector,
             ),
             stream_name="primary",
+            flush_period=0.5,
         )
 
     yield from inner_plan()
