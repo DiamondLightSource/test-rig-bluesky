@@ -1,0 +1,6 @@
+[submodule "dodal"]
+	path = dodal
+	url = git@github.com:DiamondLightSource/dodal.git
+[submodule "ophyd-async"]
+	path = ophyd-async
+	url = git@github.com:bluesky/ophyd-async.git
