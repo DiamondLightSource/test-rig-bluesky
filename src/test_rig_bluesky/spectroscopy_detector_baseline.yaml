@@ -3,37 +3,37 @@ driver.acquire_period: 0.021815
 driver.acquire_time: 0.10000
 driver.array_counter: 3
 driver.image_mode: Multiple
-driver.nd_attributes_file: ''
+driver.nd_attributes_file: ""
 driver.num_images: 1
-driver.trigger_mode: 'Off'
+driver.trigger_mode: "Off"
 driver.trigger_source: Freerun
 driver.wait_for_plugins: false
-fileio.acquire: false
-fileio.array_counter: 3
-fileio.auto_increment: true
-fileio.capture: false
-fileio.chunk_size_auto: true
-fileio.compression: None
-fileio.create_directory: 0
-fileio.enable_callbacks: Enable
-fileio.file_name: 5073260b-9688-4283-84d1-204955e423aa
-fileio.file_number: 1
-fileio.file_path: /tmp/
-fileio.file_template: '%s%s.h5'
-fileio.file_write_mode: Stream
-fileio.flush_now: false
-fileio.lazy_open: true
-fileio.nd_array_address: 0
-fileio.nd_array_port: D2.roistat
-fileio.nd_attributes_file: ''
-fileio.num_capture: 0
-fileio.num_extra_dims: 0
-fileio.num_frames_chunks: 1
-fileio.position_mode: false
-fileio.queue_size: 2
-fileio.swmr_mode: true
-fileio.wait_for_plugins: false
-fileio.xml_file_name: ''
+writer.acquire: false
+writer.array_counter: 3
+writer.auto_increment: true
+writer.capture: false
+writer.chunk_size_auto: true
+writer.compression: None
+writer.create_directory: 0
+writer.enable_callbacks: Enable
+writer.file_name: 5073260b-9688-4283-84d1-204955e423aa
+writer.file_number: 1
+writer.file_path: /tmp/
+writer.file_template: "%s%s.h5"
+writer.file_write_mode: Stream
+writer.flush_now: false
+writer.lazy_open: true
+writer.nd_array_address: 0
+writer.nd_array_port: D2.roistat
+writer.nd_attributes_file: ""
+writer.num_capture: 0
+writer.num_extra_dims: 0
+writer.num_frames_chunks: 1
+writer.position_mode: false
+writer.queue_size: 2
+writer.swmr_mode: true
+writer.wait_for_plugins: false
+writer.xml_file_name: ""
 roistat.acquire: false
 roistat.array_counter: 3
 roistat.channels.1.min_x: 95
@@ -57,7 +57,8 @@ roistat.channels.3.use: true
 roistat.enable_callbacks: Enable
 roistat.nd_array_address: 0
 roistat.nd_array_port: D2.CAM
-roistat.nd_attributes_file: <Attributes><Attribute name="&lt;ophyd_async.core._signal.SignalRW
+roistat.nd_attributes_file:
+  <Attributes><Attribute name="&lt;ophyd_async.core._signal.SignalRW
   object at 0x7ff2db389990&gt;Total" type="EPICS_PV" source="BL01C-DI-DCAM-02:ROISTAT:1:Total_RBV"
   dbrtype="DBR_LONG" description="Sum of &lt;ophyd_async.core._signal.SignalRW object
   at 0x7ff2db389990&gt; channel" /><Attribute name="&lt;ophyd_async.core._signal.SignalRW
