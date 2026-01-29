@@ -21,11 +21,7 @@ from ophyd_async.core import (
     YamlSettingsProvider,
 )
 from ophyd_async.epics.adaravis import AravisDetector
-from ophyd_async.epics.adcore import (
-    NDAttributeDataType,
-    NDAttributeParam,
-)
-from ophyd_async.epics.adcore._core_io import NDROIStatNIO
+from ophyd_async.epics.adcore import NDAttributeDataType, NDAttributeParam, NDROIStatNIO
 from ophyd_async.epics.pmac import (
     PmacIO,
     PmacTrajectoryTriggerLogic,
@@ -50,7 +46,7 @@ imaging_detector = inject("imaging_detector")
 spectroscopy_detector = inject("spectroscopy_detector")
 sample_stage = inject("sample_stage")
 pmac = inject("pmac")
-pandabox = inject("pandabox")
+pandabrick = inject("pandabrick")
 
 
 def save_settings(
@@ -187,7 +183,7 @@ def spectroscopy_fly(
     spectroscopy_detector: AravisDetector = spectroscopy_detector,
     sample_stage: XYZStage = sample_stage,
     # pmac: PmacIO = pmac,
-    pandabox: HDFPanda = pandabox,
+    pandabrick: HDFPanda = pandabrick,
     spec: Spec[Movable] | None = None,
     exposure_time: float = 0.1,
     metadata: dict[str, Any] | None = None,
@@ -254,11 +250,11 @@ def spectroscopy_fly(
 
     # Prepare motor info using trajectory scanning
     scan_frame_duration = 0.01
-    num_x = 100
-    num_y = 40
+    num_x = 35
+    num_y = 100
     spec = spec or Fly(
         scan_frame_duration
-        @ (Line(sample_stage.x, 0, 1, num_y) * ~Line(sample_stage.y, 0, 1, num_x))  # type: ignore
+        @ (Line(sample_stage.y, 0, 1, num_x) * ~Line(sample_stage.x, 0, 1, num_y))  # type: ignore
     )
 
     detector_deadtime = 2e-3 * 1.01
@@ -266,7 +262,8 @@ def spectroscopy_fly(
 
     trigger_logic = spec
     pmac_trajectory_flyer = PmacTrajectoryTriggerLogic(pmac)
-    table: SeqBlock = pandabox.seq.__1  # type: ignore # noqa: SLF001
+    # pmac_trajectory_flyer = StandardFlyer(pmac_trajectory)
+    table: SeqBlock = pandabrick.seq.__1  # type: ignore # noqa: SLF001
 
     scan_spec_info = ScanSpecInfo(spec=spec, deadtime=detector_deadtime)
 
@@ -281,7 +278,7 @@ def spectroscopy_fly(
     # Prepare Panda file writer trigger info
     panda_hdf_info = TriggerInfo(
         number_of_events=total,
-        trigger=DetectorTrigger.CONSTANT_GATE,
+        trigger=DetectorTrigger.EXTERNAL_LEVEL,
         livetime=scan_frame_livetime,
         deadtime=detector_deadtime,
     )
@@ -289,7 +286,7 @@ def spectroscopy_fly(
     # Prepare Panda file writer trigger info
     detector_info = TriggerInfo(
         number_of_events=total,
-        trigger=DetectorTrigger.CONSTANT_GATE,
+        trigger=DetectorTrigger.EXTERNAL_EDGE,
         livetime=scan_frame_livetime,
         deadtime=detector_deadtime,
     )
@@ -297,7 +294,7 @@ def spectroscopy_fly(
     @attach_data_session_metadata_decorator()
     @bpp.run_decorator()
     @bpp.stage_decorator(
-        [pandabox, panda_trigger_logic, spectroscopy_detector, pmac_trajectory_flyer]
+        [pandabrick, panda_trigger_logic, spectroscopy_detector, pmac_trajectory_flyer]
     )
     def inner_plan():
         # create a group that is waited for
@@ -308,21 +305,21 @@ def spectroscopy_fly(
         # prepare sequencer table
         yield from bps.prepare(panda_trigger_logic, scan_spec_info)
         # prepare panda and hdf writer once, at start of scan
-        yield from bps.prepare(pandabox, panda_hdf_info)
+        yield from bps.prepare(pandabrick, panda_hdf_info)
         # prepare spectroscopy_detector and info
         # waiting for this last prepare means all prepare functions will be complete
         yield from bps.prepare(spectroscopy_detector, detector_info, wait=True)
 
         # Need to run this after detectors are prepared
         yield from bps.declare_stream(
-            pandabox, spectroscopy_detector, name="primary", collect=True
+            pandabrick, spectroscopy_detector, name="primary", collect=True
         )
 
         # Start the detectors and hdf writers acquiring.
         # Configure the panda (seq table triggering).
         # create a group that is waited for before pmac_trajectory_flyer kicked off on
         # its own with wait=true.
-        yield from bps.kickoff(pandabox)
+        yield from bps.kickoff(pandabrick)
         yield from bps.kickoff(panda_trigger_logic)
         yield from bps.kickoff(spectroscopy_detector, wait=True)
 
@@ -334,11 +331,11 @@ def spectroscopy_fly(
             flyers=(
                 pmac_trajectory_flyer,
                 panda_trigger_logic,
-                pandabox,
+                pandabrick,
                 spectroscopy_detector,
             ),
             dets=(
-                pandabox,
+                pandabrick,
                 spectroscopy_detector,
             ),
             stream_name="primary",
@@ -352,7 +349,7 @@ def demo_spectroscopy(
     spectroscopy_detector: AravisDetector = spectroscopy_detector,
     sample_stage: XYZStage = sample_stage,
     # pmac: PmacIO = pmac,
-    pandabox: HDFPanda = pandabox,
+    pandabrick: HDFPanda = pandabrick,
     total_number_of_scan_points: int = 25,
     grid_size: float = 5.0,
     grid_origin_x: float = 0.0,
@@ -385,7 +382,7 @@ def demo_spectroscopy(
             spectroscopy_detector=spectroscopy_detector,
             sample_stage=sample_stage,
             # pmac=pmac,
-            pandabox=pandabox,
+            pandabrick=pandabrick,
             spec=None,
             exposure_time=exposure_time,
             metadata=metadata,
