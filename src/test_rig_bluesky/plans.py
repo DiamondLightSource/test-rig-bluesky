@@ -35,6 +35,7 @@ from ophyd_async.fastcs.panda import (
 from ophyd_async.plan_stubs import (
     apply_settings,
     apply_settings_if_different,
+    ensure_connected,
     retrieve_settings,
     setup_ndattributes,
     store_settings,
@@ -181,7 +182,7 @@ def spectroscopy(
 def spectroscopy_fly(
     spectroscopy_detector: AravisDetector = spectroscopy_detector,
     sample_stage: XYZStage = sample_stage,
-    pmac: PmacIO = pmac,
+    # pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
     spec: Spec[Movable] | None = None,
     exposure_time: float = 0.1,
@@ -238,6 +239,14 @@ def spectroscopy_fly(
         )
 
     yield from setup_ndattributes(spectroscopy_detector.roistat, params)  # type: ignore
+
+    pmac = PmacIO(
+        "BL01C-MO-PPMAC-01:",
+        raw_motors=[sample_stage.y, sample_stage.x],
+        coord_nums=[1],
+    )
+
+    yield from ensure_connected(pmac)
 
     # Prepare motor info using trajectory scanning
     scan_frame_duration = 0.01
@@ -339,7 +348,7 @@ def spectroscopy_fly(
 def demo_spectroscopy(
     spectroscopy_detector: AravisDetector = spectroscopy_detector,
     sample_stage: XYZStage = sample_stage,
-    pmac: PmacIO = pmac,
+    # pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
     total_number_of_scan_points: int = 25,
     grid_size: float = 5.0,
@@ -372,7 +381,7 @@ def demo_spectroscopy(
         yield from spectroscopy_fly(
             spectroscopy_detector=spectroscopy_detector,
             sample_stage=sample_stage,
-            pmac=pmac,
+            # pmac=pmac,
             pandabrick=pandabrick,
             spec=None,
             exposure_time=exposure_time,
