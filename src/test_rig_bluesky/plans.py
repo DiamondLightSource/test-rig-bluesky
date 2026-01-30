@@ -348,7 +348,7 @@ def spectroscopy_fly(
 def demo_spectroscopy(
     spectroscopy_detector: AravisDetector = spectroscopy_detector,
     sample_stage: XYZStage = sample_stage,
-    # pmac: PmacIO = pmac,
+    pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
     total_number_of_scan_points: int = 25,
     grid_size: float = 5.0,
