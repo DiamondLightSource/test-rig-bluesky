@@ -292,7 +292,7 @@ def spectroscopy_fly(
     )
 
     @attach_data_session_metadata_decorator()
-    @bpp.run_decorator()
+    @bpp.run_decorator(md={"shape": spec.shape()})
     @bpp.stage_decorator(
         [pandabrick, panda_trigger_logic, spectroscopy_detector, pmac_trajectory_flyer]
     )
