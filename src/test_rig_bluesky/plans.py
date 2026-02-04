@@ -184,15 +184,21 @@ def spectroscopy(
             metadata=metadata,
         )
     else:
-        yield from _fly_scan(spec, spectroscopy_detector, pandabrick, num_points)  # type: ignore
+        yield from fly_scan(
+            spec,
+            spectroscopy_detector,
+            sample_stage,
+            pandabrick,
+            num_points,  # type: ignore
+        )
 
 
-def _fly_scan(
+def fly_scan(
     spec: Spec[Movable],
-    spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
-    pandabrick: HDFPanda,
-    num_points: int,
+    spectroscopy_detector: AravisDetector = spectroscopy_detector,
+    sample_stage: XYZStage = sample_stage,
+    pandabrick: HDFPanda = pandabrick,
+    num_points: int = 1_000,
 ):
     pmac = PmacIO(
         "BL01C-MO-PPMAC-01:",
