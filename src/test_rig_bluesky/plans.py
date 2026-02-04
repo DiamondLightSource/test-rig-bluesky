@@ -190,6 +190,7 @@ def spectroscopy(
 def fly_scan(
     spec: Spec[Movable],
     spectroscopy_detector: AravisDetector = spectroscopy_detector,
+    sample_stage: XYZStage = sample_stage,
     pandabrick: HDFPanda = pandabrick,
     num_points: int = 1_000,
 ):
