@@ -209,13 +209,7 @@ def fly_scan(
     yield from ensure_connected(pmac)
 
     scan_frame_duration = 0.01
-    # fly_spec = Fly(scan_frame_duration @ spec)  # type: ignore
-    num_x = 35
-    num_y = 100
-    fly_spec = Fly(
-        scan_frame_duration
-        @ (Line(sample_stage.y, 0, 1, num_x) * ~Line(sample_stage.x, 0, 1, num_y))  # type: ignore
-    )
+    fly_spec = Fly(scan_frame_duration @ spec)  # type: ignore
     detector_deadtime = 2e-3 * 1.01
 
     trigger_logic = fly_spec
