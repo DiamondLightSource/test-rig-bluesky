@@ -94,6 +94,8 @@ def snapshot(
 def spectroscopy(
     spectroscopy_detector: AravisDetector = spectroscopy_detector,
     sample_stage: XYZStage = sample_stage,
+    pandabrick: HDFPanda = pandabrick,
+    num_points: int = 25,
     spec: Spec[Movable] | None = None,
     exposure_time: float = 0.1,
     metadata: dict[str, Any] | None = None,
@@ -174,72 +176,30 @@ def spectroscopy(
         ],
     )
 
-    spec = spec or Line(sample_stage.x, 0, 5, 5)
-
-    yield from spec_scan({spectroscopy_detector, sample_stage}, spec, metadata=metadata)
-
-
-def spectroscopy_fly(
-    spectroscopy_detector: AravisDetector = spectroscopy_detector,
-    sample_stage: XYZStage = sample_stage,
-    # pmac: PmacIO = pmac,
-    pandabrick: HDFPanda = pandabrick,
-    spec: Spec[Movable] | None = None,
-    exposure_time: float = 0.1,
-    metadata: dict[str, Any] | None = None,
-) -> MsgGenerator[None]:
-    yield from load_settings(
-        device=spectroscopy_detector,
-        design_name="spectroscopy_detector_baseline",
-        whitelist_pvs=[
-            "fileio-nd_array_port",
-            "fileio-enable_callbacks",
-            # "driver-acquire",
-            # "driver-trigger_mode",
-            # "driver-trigger_source",
-            "roistat-channels-array_counter",
-            "roistat-channels-1-min_x",
-            "roistat-channels-1-min_y",
-            "roistat-channels-1-name_",
-            "roistat-channels-1-size_x",
-            "roistat-channels-1-size_y",
-            "roistat-channels-1-use",
-            "roistat-channels-2-min_x",
-            "roistat-channels-2-min_y",
-            "roistat-channels-2-name_",
-            "roistat-channels-2-size_x",
-            "roistat-channels-2-size_y",
-            "roistat-channels-2-use",
-            "roistat-channels-3-min_x",
-            "roistat-channels-3-min_y",
-            "roistat-channels-3-name_",
-            "roistat-channels-3-size_x",
-            "roistat-channels-3-size_y",
-            "roistat-channels-3-use",
-            "roistat-nd_array_port",
-            "roistat-enable_callbacks",
-        ],
-    )
-
-    params: list[NDAttributeParam] = []
-    for channel in list(spectroscopy_detector.roistat.channels.keys()):  # type: ignore
-        roistatn = spectroscopy_detector.roistat.channels[channel]  # type: ignore
-        assert isinstance(roistatn, NDROIStatNIO)
-
-        channel_name = yield from bps.rd(roistatn.name_)
-
-        params.append(
-            NDAttributeParam(
-                name=f"{channel_name}Total",
-                param="ROISTAT_TOTAL",
-                datatype=NDAttributeDataType.DOUBLE,
-                addr=channel - 1,
-                description=f"Sum of {channel_name} channel",
-            )
+    spec = spec or Line(sample_stage.x, 0, 5, 5)  # type: ignore
+    if num_points < 1_000:
+        yield from spec_scan(
+            {spectroscopy_detector, sample_stage},
+            spec,  # type: ignore
+            metadata=metadata,
+        )
+    else:
+        yield from fly_scan(
+            spec,
+            spectroscopy_detector,
+            sample_stage,
+            pandabrick,
+            num_points,  # type: ignore
         )
 
-    yield from setup_ndattributes(spectroscopy_detector.roistat, params)  # type: ignore
 
+def fly_scan(
+    spec: Spec[Movable],
+    spectroscopy_detector: AravisDetector = spectroscopy_detector,
+    sample_stage: XYZStage = sample_stage,
+    pandabrick: HDFPanda = pandabrick,
+    num_points: int = 1_000,
+):
     pmac = PmacIO(
         "BL01C-MO-PPMAC-01:",
         raw_motors=[sample_stage.y, sample_stage.x],
@@ -248,24 +208,15 @@ def spectroscopy_fly(
 
     yield from ensure_connected(pmac)
 
-    # Prepare motor info using trajectory scanning
     scan_frame_duration = 0.01
-    num_x = 35
-    num_y = 100
-    spec = spec or Fly(
-        scan_frame_duration
-        @ (Line(sample_stage.y, 0, 1, num_x) * ~Line(sample_stage.x, 0, 1, num_y))  # type: ignore
-    )
-
+    fly_spec = Fly(scan_frame_duration @ spec)  # type: ignore
     detector_deadtime = 2e-3 * 1.01
-    total = num_x * num_y
 
-    trigger_logic = spec
+    trigger_logic = fly_spec
     pmac_trajectory_flyer = PmacTrajectoryTriggerLogic(pmac)
-    # pmac_trajectory_flyer = StandardFlyer(pmac_trajectory)
     table: SeqBlock = pandabrick.seq.__1  # type: ignore # noqa: SLF001
 
-    scan_spec_info = ScanSpecInfo(spec=spec, deadtime=detector_deadtime)
+    scan_spec_info = ScanSpecInfo(spec=fly_spec, deadtime=detector_deadtime)  # type: ignore
 
     panda_trigger_logic = StandardFlyer(
         ScanSpecSeqTableTriggerLogic(
@@ -277,7 +228,7 @@ def spectroscopy_fly(
 
     # Prepare Panda file writer trigger info
     panda_hdf_info = TriggerInfo(
-        number_of_events=total,
+        number_of_events=num_points,
         trigger=DetectorTrigger.EXTERNAL_LEVEL,
         livetime=scan_frame_livetime,
         deadtime=detector_deadtime,
@@ -285,7 +236,7 @@ def spectroscopy_fly(
 
     # Prepare Panda file writer trigger info
     detector_info = TriggerInfo(
-        number_of_events=total,
+        number_of_events=num_points,
         trigger=DetectorTrigger.EXTERNAL_EDGE,
         livetime=scan_frame_livetime,
         deadtime=detector_deadtime,
@@ -348,7 +299,7 @@ def spectroscopy_fly(
 def demo_spectroscopy(
     spectroscopy_detector: AravisDetector = spectroscopy_detector,
     sample_stage: XYZStage = sample_stage,
-    pmac: PmacIO = pmac,
+    # pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
     total_number_of_scan_points: int = 25,
     grid_size: float = 5.0,
@@ -366,24 +317,18 @@ def demo_spectroscopy(
     xmax = grid_origin_x + grid_size
     ymin = grid_origin_y
     ymax = grid_origin_y + grid_size
-    grid = Line(sample_stage.y, ymin, ymax, ysteps) * Line(
-        sample_stage.x, xmin, xmax, xsteps
+    grid = Line(sample_stage.y, ymin, ymax, ysteps) * Line(  # type: ignore
+        sample_stage.x,  # type: ignore
+        xmin,
+        xmax,
+        xsteps,
     )
-    if total_number_of_scan_points < 1000:
-        yield from spectroscopy(
-            spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
-            spec=grid,
-            exposure_time=exposure_time,
-            metadata=metadata,
-        )
-    else:
-        yield from spectroscopy_fly(
-            spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
-            # pmac=pmac,
-            pandabrick=pandabrick,
-            spec=None,
-            exposure_time=exposure_time,
-            metadata=metadata,
-        )
+    yield from spectroscopy(
+        spectroscopy_detector=spectroscopy_detector,
+        sample_stage=sample_stage,
+        pandabrick=pandabrick,
+        num_points=total_number_of_scan_points,
+        spec=grid,
+        exposure_time=exposure_time,
+        metadata=metadata,
+    )
