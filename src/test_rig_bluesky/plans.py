@@ -317,7 +317,7 @@ def demo_spectroscopy(
     xmax = grid_origin_x + grid_size
     ymin = grid_origin_y
     ymax = grid_origin_y + grid_size
-    grid = Line(sample_stage.y, ymin, ymax, ysteps) * Line(  # type: ignore
+    grid = Line(sample_stage.y, ymin, ymax, ysteps) * ~Line(  # type: ignore
         sample_stage.x,  # type: ignore
         xmin,
         xmax,
