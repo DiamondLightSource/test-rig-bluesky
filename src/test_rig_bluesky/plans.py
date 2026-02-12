@@ -33,6 +33,7 @@ from ophyd_async.fastcs.panda import (
     SeqBlock,
 )
 from ophyd_async.plan_stubs import (
+    apply_panda_settings,
     apply_settings,
     apply_settings_if_different,
     ensure_connected,
@@ -74,6 +75,25 @@ def load_settings(
         }
         settings_to_set = Settings(settings.device, signal_values)
     yield from apply_settings_if_different(settings_to_set, apply_settings)
+
+
+def load_panda_settings(
+    panda: HDFPanda,
+    design_name: str,
+    whitelist_pvs: list[str] | None = None,
+) -> MsgGenerator[None]:
+    provider = _settings_provider()
+    settings = yield from retrieve_settings(provider, design_name, panda)
+    if whitelist_pvs is None:
+        settings_to_set = settings
+    else:
+        signal_values = {
+            signal: value
+            for signal, value in settings.items()
+            if signal.name.replace(f"{panda.name}-", "") in whitelist_pvs
+        }
+        settings_to_set = Settings(settings.panda, signal_values)
+    yield from apply_settings_if_different(settings_to_set, apply_panda_settings)
 
 
 def _settings_provider() -> SettingsProvider:
@@ -143,7 +163,7 @@ def spectroscopy(
     yield from bps.mv(
         *(spectroscopy_detector.driver.acquire_time, exposure_time),
         *(spectroscopy_detector.driver.acquire_period, exposure_time + 1961e-6),
-        wait=True,
+        group="spectroscopy_detector_aquire",
     )
 
     params: list[NDAttributeParam] = []
@@ -200,6 +220,8 @@ def fly_scan(
     pandabrick: HDFPanda = pandabrick,
     num_points: int = 1_000,
 ):
+    yield from load_panda_settings(panda=pandabrick, design_name="pandabrick_baseline")
+
     pmac = PmacIO(
         "BL01C-MO-PPMAC-01:",
         raw_motors=[sample_stage.y, sample_stage.x],
