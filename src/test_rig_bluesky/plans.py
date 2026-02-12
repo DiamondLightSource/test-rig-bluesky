@@ -341,6 +341,12 @@ def demo_spectroscopy(
     xmax = grid_origin_x + grid_size
     ymin = grid_origin_y
     ymax = grid_origin_y + grid_size
+
+    # Move to the start point
+    yield from bps.mv(
+        *(sample_stage.x, xmin), *(sample_stage.y, ymin), group="initial_move"
+    )
+
     grid = Line(sample_stage.y, ymin, ymax, ysteps) * ~Line(  # type: ignore
         sample_stage.x,  # type: ignore
         xmin,
