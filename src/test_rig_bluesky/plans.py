@@ -210,6 +210,7 @@ def spectroscopy(
             sample_stage,
             pandabrick,
             num_points,  # type: ignore
+            exposure_time,
         )
 
 
@@ -219,6 +220,7 @@ def fly_scan(
     sample_stage: XYZStage = sample_stage,
     pandabrick: HDFPanda = pandabrick,
     num_points: int = 1_000,
+    exposure_time: float = 0.1,
 ):
     yield from load_panda_settings(panda=pandabrick, design_name="pandabrick_baseline")
 
@@ -230,7 +232,7 @@ def fly_scan(
 
     yield from ensure_connected(pmac)
 
-    scan_frame_duration = 0.01
+    scan_frame_duration = exposure_time
     fly_spec = Fly(scan_frame_duration @ spec)  # type: ignore
     detector_deadtime = 2e-3 * 1.01
 
