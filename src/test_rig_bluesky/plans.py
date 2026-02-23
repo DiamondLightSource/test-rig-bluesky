@@ -240,17 +240,6 @@ def fly_scan(
 
     yield from ensure_connected(pmac)
 
-    # Reproduce metadata present in spec_scan
-    _md = {
-        "plan_args": {
-            "detectors": {det.name for det in [pandabrick, spectroscopy_detector]},
-            "spec": repr(spec),
-        },
-        "plan_name": "spec_scan",
-        "shape": spec.shape(),
-        **(metadata or {}),
-    }
-
     scan_frame_duration = exposure_time
     fly_spec = Fly(scan_frame_duration @ spec)  # type: ignore
     detector_deadtime = 2e-3 * 1.01
@@ -268,6 +257,17 @@ def fly_scan(
     )
 
     scan_frame_livetime = scan_frame_duration - detector_deadtime
+
+    # Reproduce metadata present in spec_scan
+    _md = {
+        "plan_args": {
+            "detectors": {det.name for det in [pandabrick, spectroscopy_detector]},
+            "spec": repr(fly_spec),
+        },
+        "plan_name": "fly_scan",
+        "shape": fly_spec.shape(),
+        **(metadata or {}),
+    }
 
     # Prepare Panda file writer trigger info
     panda_hdf_info = TriggerInfo(
