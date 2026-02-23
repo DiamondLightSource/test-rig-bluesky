@@ -1,3 +1,4 @@
+import logging
 import math
 from pathlib import Path
 from typing import Any
@@ -42,6 +43,8 @@ from ophyd_async.plan_stubs import (
     store_settings,
 )
 from scanspec.specs import Fly, Line, Spec
+
+LOGGER = logging.getLogger(__name__)
 
 imaging_detector = inject("imaging_detector")
 spectroscopy_detector = inject("spectroscopy_detector")
@@ -118,6 +121,7 @@ def spectroscopy(
     num_points: int = 25,
     spec: Spec[Movable] | None = None,
     exposure_time: float = 0.1,
+    fly: bool = True,
     metadata: dict[str, Any] | None = None,
 ) -> MsgGenerator[None]:
     """Do a spectroscopy scan."""
@@ -203,13 +207,8 @@ def spectroscopy(
     )
 
     spec = spec or Line(sample_stage.x, 0, 5, 5)  # type: ignore
-    if num_points < 1_000:
-        yield from spec_scan(
-            {spectroscopy_detector, sample_stage},
-            spec,  # type: ignore
-            metadata=metadata,
-        )
-    else:
+    if fly:
+        LOGGER.info("Performing a fly scan.")
         yield from fly_scan(
             spec,
             spectroscopy_detector,
@@ -218,6 +217,13 @@ def spectroscopy(
             num_points,  # type: ignore
             exposure_time,
             metadata,
+        )
+    else:
+        LOGGER.info("Performing a step scan.")
+        yield from spec_scan(
+            {spectroscopy_detector, sample_stage},
+            spec,  # type: ignore
+            metadata=metadata,
         )
 
 
@@ -361,6 +367,19 @@ def demo_spectroscopy(
     ymin = grid_origin_y
     ymax = grid_origin_y + grid_size
 
+    velomax = grid_size / (xsteps * exposure_time)
+    if velomax <= 10 * 0.98:
+        fly = True
+        LOGGER.info("test-rig-bluesky")
+        LOGGER.info(
+            f"Estimated velocity is {velomax:.2f} mm/sec, performing a fly scan."
+        )
+    else:
+        fly = False
+        LOGGER.info(
+            f"Estimated velocity is {velomax:.2f} mm/sec, performing a step scan."
+        )
+
     # Move to the start point
     yield from bps.mv(
         *(sample_stage.x, xmin), *(sample_stage.y, ymin), group="initial_move"
@@ -379,5 +398,6 @@ def demo_spectroscopy(
         num_points=total_number_of_scan_points,
         spec=grid,
         exposure_time=exposure_time,
+        fly=fly,
         metadata=metadata,
     )
