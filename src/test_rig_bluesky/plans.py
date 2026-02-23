@@ -92,7 +92,7 @@ def load_panda_settings(
             for signal, value in settings.items()
             if signal.name.replace(f"{panda.name}-", "") in whitelist_pvs
         }
-        settings_to_set = Settings(settings.panda, signal_values)
+        settings_to_set = Settings(settings.device, signal_values)
     yield from apply_settings_if_different(settings_to_set, apply_panda_settings)
 
 
@@ -196,6 +196,12 @@ def spectroscopy(
         ],
     )
 
+    yield from load_panda_settings(
+        panda=pandabrick,
+        design_name="pandabrick_baseline",
+        whitelist_pvs=["incenc-__3-val_dataset", "incenc-__2-val_dataset"],
+    )
+
     spec = spec or Line(sample_stage.x, 0, 5, 5)  # type: ignore
     if num_points < 1_000:
         yield from spec_scan(
@@ -211,6 +217,7 @@ def spectroscopy(
             pandabrick,
             num_points,  # type: ignore
             exposure_time,
+            metadata,
         )
 
 
@@ -221,6 +228,7 @@ def fly_scan(
     pandabrick: HDFPanda = pandabrick,
     num_points: int = 1_000,
     exposure_time: float = 0.1,
+    metadata: dict[str, Any] | None = None,
 ):
     yield from load_panda_settings(panda=pandabrick, design_name="pandabrick_baseline")
 
@@ -231,6 +239,17 @@ def fly_scan(
     )
 
     yield from ensure_connected(pmac)
+
+    # Reproduce metadata present in spec_scan
+    _md = {
+        "plan_args": {
+            "detectors": {det.name for det in [pandabrick, spectroscopy_detector]},
+            "spec": repr(spec),
+        },
+        "plan_name": "spec_scan",
+        "shape": spec.shape(),
+        **(metadata or {}),
+    }
 
     scan_frame_duration = exposure_time
     fly_spec = Fly(scan_frame_duration @ spec)  # type: ignore
@@ -267,7 +286,7 @@ def fly_scan(
     )
 
     @attach_data_session_metadata_decorator()
-    @bpp.run_decorator(md={"shape": spec.shape()})
+    @bpp.run_decorator(md=_md)
     @bpp.stage_decorator(
         [pandabrick, panda_trigger_logic, spectroscopy_detector, pmac_trajectory_flyer]
     )
