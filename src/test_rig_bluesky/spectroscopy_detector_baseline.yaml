@@ -8,7 +8,6 @@ driver.num_images: 1
 driver.trigger_mode: "Off"
 driver.trigger_source: Freerun
 driver.wait_for_plugins: false
-writer.acquire: false
 writer.array_counter: 3
 writer.auto_increment: true
 writer.capture: false
@@ -32,13 +31,11 @@ writer.num_frames_chunks: 1
 writer.position_mode: false
 writer.queue_size: 2
 writer.swmr_mode: true
-writer.wait_for_plugins: false
 writer.xml_file_name: ""
-roistat.acquire: false
 roistat.array_counter: 3
-roistat.channels.1.min_x: 1511
-roistat.channels.1.min_y: 104
-roistat.channels.1.name_: Red
+roistat.channels.1.min_x: 295
+roistat.channels.1.min_y: 114
+roistat.channels.1.name_: Blue
 roistat.channels.1.size_x: 150
 roistat.channels.1.size_y: 150
 roistat.channels.1.use: true
@@ -48,25 +45,26 @@ roistat.channels.2.name_: Green
 roistat.channels.2.size_x: 150
 roistat.channels.2.size_y: 150
 roistat.channels.2.use: true
-roistat.channels.3.min_x: 295
-roistat.channels.3.min_y: 114
-roistat.channels.3.name_: Blue
+roistat.channels.3.min_x: 1511
+roistat.channels.3.min_y: 104
+roistat.channels.3.name_: Red
 roistat.channels.3.size_x: 150
 roistat.channels.3.size_y: 150
 roistat.channels.3.use: true
 roistat.enable_callbacks: Enable
 roistat.nd_array_address: 0
 roistat.nd_array_port: D2.CAM
-roistat.nd_attributes_file:
-  <Attributes><Attribute name="&lt;ophyd_async.core._signal.SignalRW
-  object at 0x7ff2db389990&gt;Total" type="EPICS_PV" source="BL01C-DI-DCAM-02:ROISTAT:1:Total_RBV"
-  dbrtype="DBR_LONG" description="Sum of &lt;ophyd_async.core._signal.SignalRW object
-  at 0x7ff2db389990&gt; channel" /><Attribute name="&lt;ophyd_async.core._signal.SignalRW
-  object at 0x7ff2db38bb10&gt;Total" type="EPICS_PV" source="BL01C-DI-DCAM-02:ROISTAT:2:Total_RBV"
-  dbrtype="DBR_LONG" description="Sum of &lt;ophyd_async.core._signal.SignalRW object
-  at 0x7ff2db38bb10&gt; channel" /><Attribute name="&lt;ophyd_async.core._signal.SignalRW
-  object at 0x7ff2db39d3d0&gt;Total" type="EPICS_PV" source="BL01C-DI-DCAM-02:ROISTAT:3:Total_RBV"
-  dbrtype="DBR_LONG" description="Sum of &lt;ophyd_async.core._signal.SignalRW object
-  at 0x7ff2db39d3d0&gt; channel" /></Attributes>
+roistat.nd_attributes_file: <Attributes><Attribute
+  name="&lt;ophyd_async.core._signal.SignalRW object at 0x7ff2db389990&gt;Total"
+  type="EPICS_PV" source="BL01C-DI-DCAM-02:ROISTAT:1:Total_RBV"
+  dbrtype="DBR_LONG" description="Sum of &lt;ophyd_async.core._signal.SignalRW
+  object at 0x7ff2db389990&gt; channel" /><Attribute
+  name="&lt;ophyd_async.core._signal.SignalRW object at 0x7ff2db38bb10&gt;Total"
+  type="EPICS_PV" source="BL01C-DI-DCAM-02:ROISTAT:2:Total_RBV"
+  dbrtype="DBR_LONG" description="Sum of &lt;ophyd_async.core._signal.SignalRW
+  object at 0x7ff2db38bb10&gt; channel" /><Attribute
+  name="&lt;ophyd_async.core._signal.SignalRW object at 0x7ff2db39d3d0&gt;Total"
+  type="EPICS_PV" source="BL01C-DI-DCAM-02:ROISTAT:3:Total_RBV"
+  dbrtype="DBR_LONG" description="Sum of &lt;ophyd_async.core._signal.SignalRW
+  object at 0x7ff2db39d3d0&gt; channel" /></Attributes>
 roistat.queue_size: 2
-roistat.wait_for_plugins: false
