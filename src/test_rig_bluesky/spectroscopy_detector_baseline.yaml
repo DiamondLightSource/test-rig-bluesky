@@ -23,7 +23,7 @@ writer.file_write_mode: Stream
 writer.flush_now: false
 writer.lazy_open: true
 writer.nd_array_address: 0
-writer.nd_array_port: D2.roistat
+writer.nd_array_port: D2.ROISTAT
 writer.nd_attributes_file: ""
 writer.num_capture: 0
 writer.num_extra_dims: 0
@@ -53,7 +53,7 @@ roistat.channels.3.size_y: 150
 roistat.channels.3.use: true
 roistat.enable_callbacks: Enable
 roistat.nd_array_address: 0
-roistat.nd_array_port: D2.CAM
+roistat.nd_array_port: D2.DRV
 roistat.nd_attributes_file: <Attributes><Attribute
   name="&lt;ophyd_async.core._signal.SignalRW object at 0x7ff2db389990&gt;Total"
   type="EPICS_PV" source="BL01C-DI-DCAM-02:ROISTAT:1:Total_RBV"
