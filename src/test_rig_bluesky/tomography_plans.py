@@ -10,6 +10,7 @@ import logging
 from typing import Any
 
 import bluesky.plan_stubs as bps
+import bluesky.preprocessors as bpp
 from bluesky.protocols import Movable
 from bluesky.utils import MsgGenerator
 from dodal.common import inject
@@ -186,13 +187,24 @@ def demo_tomography(
     last_angle = start_angle + angular_range - angular_step
     scan = Line(tomography_stage, start_angle, last_angle, num_projections)  # type: ignore
 
-    yield from tomography(
-        tomography_detector=tomography_detector,
-        tomography_stage=tomography_stage,
-        pmac=pmac,
-        pandabrick=pandabrick,
-        spec=scan,
-        exposure_time=exposure_time,
-        fly=fly,
-        metadata=metadata,
+    def wind_back() -> MsgGenerator[None]:
+        # The scan finishes near last_angle, plus whatever run-down the PMAC
+        # adds, so unwind to leave the stage where the next scan expects it.
+        # This is a full reverse rotation, not a short hop to the equivalent
+        # angle: motor positions are linear, not modulo 360. Winding back also
+        # stops repeated scans accumulating cable wrap.
+        yield from bps.mv(tomography_stage, start_angle, group="wind_back")
+
+    yield from bpp.finalize_wrapper(
+        tomography(
+            tomography_detector=tomography_detector,
+            tomography_stage=tomography_stage,
+            pmac=pmac,
+            pandabrick=pandabrick,
+            spec=scan,
+            exposure_time=exposure_time,
+            fly=fly,
+            metadata=metadata,
+        ),
+        wind_back,
     )
