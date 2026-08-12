@@ -14,12 +14,11 @@ from ophyd_async.testing import assert_emitted
 from scanspec.specs import Line
 
 from test_rig_bluesky.plans import (
-    demo_spectroscopy,
     load_settings,
     save_settings,
     snapshot,
-    spectroscopy,
 )
+from test_rig_bluesky.spectroscopy_plans import demo_spectroscopy, spectroscopy
 
 
 @pytest.fixture
@@ -128,7 +127,7 @@ def test_snapshot(
     docs = defaultdict(list)
     run_engine.subscribe(lambda name, doc: docs[name].append(doc))
 
-    run_engine(snapshot(imaging_detector, spectroscopy_detector, sample_stage))
+    run_engine(snapshot([imaging_detector, spectroscopy_detector, sample_stage]))
 
     assert_emitted(
         docs, start=1, descriptor=1, stream_resource=2, stream_datum=2, event=1, stop=1
@@ -257,7 +256,9 @@ async def test_spectroscopy_sets_exposure_time_and_acquire_period(
 def test_demo_spectroscopy():
     fake_detector = unittest.mock.MagicMock(name="fake_detector")
     fake_stage = unittest.mock.MagicMock(name="fake_stage")
-    with unittest.mock.patch("test_rig_bluesky.plans.spectroscopy") as mock_spec:
+    with unittest.mock.patch(
+        "test_rig_bluesky.spectroscopy_plans.spectroscopy"
+    ) as mock_spec:
         # Call the generator function and exhaust it
         generator = demo_spectroscopy(
             spectroscopy_detector=fake_detector,

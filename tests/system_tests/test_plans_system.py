@@ -4,7 +4,7 @@ from blueapi.service.model import TaskRequest
 from bluesky import RunEngine
 from scanspec.specs import Line
 
-from test_rig_bluesky.plans import spectroscopy
+from test_rig_bluesky.spectroscopy_plans import spectroscopy
 from test_rig_bluesky.testing import BlueskyPlanRunner
 
 
@@ -14,7 +14,13 @@ def test_snapshot(
     events = bluesky_plan_runner.run(
         TaskRequest(
             name="snapshot",
-            params={},
+            params={
+                "devices": [
+                    "imaging_detector",
+                    "spectroscopy_detector",
+                    "sample_stage",
+                ]
+            },
             instrument_session=latest_commissioning_instrument_session,
         ),
         timeout=10,
