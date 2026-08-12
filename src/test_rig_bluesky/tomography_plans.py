@@ -141,7 +141,7 @@ def _setup_detector(
 @attach_data_session_metadata_decorator()
 def collect_calibration_images(
     calibration_type: CalibrationType,
-    light_source: LightSource,
+    light_source: LightSource | None = None,
     tomography_detector: AravisDetector = tomography_detector,
     num_images: int = 20,
     exposure_time: float = 0.1,
@@ -149,9 +149,13 @@ def collect_calibration_images(
 ) -> MsgGenerator[None]:
     """Collect flat or dark field images for the reconstruction to normalise with.
 
-    The two enums are recorded in the run's metadata under "calibration_type"
-    and "light_source" so the workflow can find the right images for a given
-    scan. Pass the same light_source you will pass to ``tomography``.
+    Recorded in the run's metadata under "calibration_type" and, for flats,
+    "light_source", so the workflow can find the right images for a given scan.
+
+    :param light_source: required for flats, ignored for darks. A dark field is
+        taken with the beam off, so the illumination it will be used with is not
+        a property of the measurement - one set of darks serves both. Pass the
+        same value you will pass to ``tomography``.
 
     This plan does not operate the shutter, the LED or the sample stage - set
     the beam and sample up for the kind of image you are taking before running
@@ -161,24 +165,33 @@ def collect_calibration_images(
     Images are internally triggered: the PandA is not involved, and
     ophyd-async turns external triggering off when preparing for a count.
     """
+    run_metadata: dict[str, Any] = {CALIBRATION_TYPE_KEY: calibration_type.value}
+    if calibration_type is CalibrationType.FLAT:
+        if light_source is None:
+            raise ValueError(
+                "light_source is required for flat fields, so the workflow can "
+                "match them to scans taken under the same illumination."
+            )
+        run_metadata[LIGHT_SOURCE_KEY] = light_source.value
+        LOGGER.info(
+            "Collecting %d flat images under %s illumination.",
+            num_images,
+            light_source.value,
+        )
+    else:
+        if light_source is not None:
+            LOGGER.info(
+                "Ignoring light_source=%s: dark fields are taken with the beam "
+                "off, so one set serves every illumination.",
+                light_source.value,
+            )
+        LOGGER.info("Collecting %d dark images.", num_images)
+
+    run_metadata.update(metadata or {})
+
     yield from _setup_detector(tomography_detector, exposure_time)
 
-    LOGGER.info(
-        "Collecting %d %s images under %s illumination.",
-        num_images,
-        calibration_type.value,
-        light_source.value,
-    )
-
-    yield from count(
-        [tomography_detector],
-        num=num_images,
-        md={
-            CALIBRATION_TYPE_KEY: calibration_type.value,
-            LIGHT_SOURCE_KEY: light_source.value,
-            **(metadata or {}),
-        },
-    )
+    yield from count([tomography_detector], num=num_images, md=run_metadata)
 
 
 def tomography(
