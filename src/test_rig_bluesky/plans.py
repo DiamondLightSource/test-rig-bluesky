@@ -91,8 +91,8 @@ def load_panda_settings(
 
 
 def _settings_provider() -> SettingsProvider:
-    this_directory = Path(__file__).parent
-    return YamlSettingsProvider(this_directory)
+    baselines_directory = Path(__file__).parent / "baselines"
+    return YamlSettingsProvider(baselines_directory)
 
 
 def serialize_spec(spec: Spec[Any]) -> Any:
