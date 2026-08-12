@@ -17,7 +17,6 @@ from ophyd_async.core import (
     Device,
     Settings,
     SettingsProvider,
-    StandardFlyer,
     TriggerInfo,
     YamlSettingsProvider,
 )
@@ -28,11 +27,11 @@ from ophyd_async.epics.adcore import (
     NDROIStatNIO,
     setup_ndattributes,
 )
-from ophyd_async.epics.pmac import PmacIO, PmacTrajectoryTriggerLogic
+from ophyd_async.epics.pmac import PmacIO, PmacScanInfo, PmacTrajectoryFlyableLogic
 from ophyd_async.fastcs.panda import (
     HDFPanda,
     ScanSpecInfo,
-    ScanSpecSeqTableTriggerLogic,
+    ScanSpecSeqTableFlyableLogic,
     SeqBlock,
     apply_panda_settings,
 )
@@ -131,8 +130,8 @@ def spectroscopy(
         device=spectroscopy_detector,
         design_name="spectroscopy_detector_baseline",
         whitelist_pvs=[
-            "fileio-nd_array_port",
-            "fileio-enable_callbacks",
+            "hdf-nd_array_port",
+            "hdf-enable_callbacks",
             "driver-acquire",
             "driver-trigger_mode",
             "driver-trigger_source",
@@ -208,8 +207,6 @@ def spectroscopy(
     #     whitelist_pvs=["incenc-__3-val_dataset", "incenc-__2-val_dataset"],
     # )
 
-    LOGGER.info("Panda Children: %s", list(pandabrick.absenc.children()))  # type: ignore
-
     spec = spec or Line(sample_stage.x, 0, 5, 5)  # type: ignore
 
     # NOTE: replace with spec_serialized = spec.serialize() when this merges: https://github.com/bluesky/scanspec/pull/208
@@ -271,10 +268,9 @@ def fly_scan(
     fly_spec = Fly(scan_frame_duration @ spec)  # type: ignore
     detector_deadtime = 2e-3 * 1.01
 
-    trigger_logic = fly_spec
-    pmac_trigger_logic = PmacTrajectoryTriggerLogic(pmac)
     table: SeqBlock = pandabrick.seq[1]  # type: ignore # noqa: SLF001
 
+    pmac_scan_info = PmacScanInfo(spec=fly_spec, ramp_time=None, turnaround_time=None)  # type: ignore
     scan_spec_info = ScanSpecInfo(spec=fly_spec, deadtime=detector_deadtime)  # type: ignore
 
     # motor_pos_out = {
@@ -282,12 +278,15 @@ def fly_scan(
     #     sample_stage.y: PosOutScaleOffset.from_inenc(pandabrick, 3)
     # }
 
-    panda_trigger_logic = StandardFlyer(
-        ScanSpecSeqTableTriggerLogic(
-            table,
-            # motor_pos_out
-        )
+    # The trajectory and seq-table logics are bare FlyableLogic; wrap each in an
+    # ephemeral StandardFlyable so the RunEngine can prepare/kickoff/complete it.
+    pmac_trigger_logic = PmacTrajectoryFlyableLogic(pmac).with_device(
+        name="pmac_trigger_logic"
     )
+    panda_trigger_logic = ScanSpecSeqTableFlyableLogic(
+        table,
+        # motor_pos_out
+    ).with_device(name="panda_trigger_logic")
 
     scan_frame_livetime = scan_frame_duration - detector_deadtime
 
@@ -328,7 +327,7 @@ def fly_scan(
         # Hashable prepare_group = ["pmac_trigger_logic", "trigger_logic"]
 
         # Prepare pmac with the trajectory
-        yield from bps.prepare(pmac_trigger_logic, trigger_logic)
+        yield from bps.prepare(pmac_trigger_logic, pmac_scan_info)
         # prepare sequencer table
         yield from bps.prepare(panda_trigger_logic, scan_spec_info)
         # prepare panda and hdf writer once, at start of scan
