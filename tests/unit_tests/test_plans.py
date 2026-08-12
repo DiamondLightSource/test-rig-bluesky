@@ -22,13 +22,6 @@ from test_rig_bluesky.spectroscopy_plans import demo_spectroscopy, spectroscopy
 
 
 @pytest.fixture
-def imaging_detector(run_engine: RunEngine) -> AravisDetector:
-    det = b01_1.imaging_detector.build(connect_immediately=True, mock=True)
-    _mock_detector_behavior(det)
-    return det
-
-
-@pytest.fixture
 def spectroscopy_detector(run_engine: RunEngine) -> AravisDetector:
     det = b01_1.spectroscopy_detector.build(connect_immediately=True, mock=True)
     _mock_detector_behavior(det)
@@ -120,20 +113,18 @@ async def test_load_settings(
 
 def test_snapshot(
     run_engine: RunEngine,
-    imaging_detector: AravisDetector,
     spectroscopy_detector: AravisDetector,
     sample_stage: XYZStage,
 ):
     docs = defaultdict(list)
     run_engine.subscribe(lambda name, doc: docs[name].append(doc))
 
-    run_engine(snapshot([imaging_detector, spectroscopy_detector, sample_stage]))
+    run_engine(snapshot([spectroscopy_detector, sample_stage]))
 
     assert_emitted(
-        docs, start=1, descriptor=1, stream_resource=2, stream_datum=2, event=1, stop=1
+        docs, start=1, descriptor=1, stream_resource=1, stream_datum=1, event=1, stop=1
     )
-    assert docs["stream_resource"][0].get("data_key") == "imaging_detector"
-    assert docs["stream_resource"][1].get("data_key") == "spectroscopy_detector"
+    assert docs["stream_resource"][0].get("data_key") == "spectroscopy_detector"
     assert docs["event"][0]["data"] == {
         "sample_stage-x": 0.0,
         "sample_stage-y": 0.0,

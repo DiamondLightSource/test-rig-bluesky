@@ -22,14 +22,7 @@ from ophyd_async.epics.pmac import PmacIO
 from ophyd_async.fastcs.panda import HDFPanda
 from scanspec.specs import Line, Spec
 
-from .plans import (
-    ARAVIS_ACQUIRE_PERIOD_PAD,
-    fly_scan,
-    load_settings,
-    pandabrick,
-    pmac,
-    serialize_spec,
-)
+from .plans import fly_scan, load_settings, pandabrick, pmac, serialize_spec
 
 LOGGER = logging.getLogger(__name__)
 
@@ -42,10 +35,24 @@ tomography_stage = inject("tomography_stage")
 # Hardware facts, so a blueapi user cannot get them wrong. exposure_time stays
 # a plan argument because it is genuinely per-scan.
 
-# The tomography camera is an Aravis, as the spectroscopy one is, so it shares
-# the deadtime; the readout pad comes from plans.py for the same reason.
-# https://github.com/bluesky/ophyd-async/blob/15fa34b6ea2a28e2f27265a5564c9ee36423f1b7/src/ophyd_async/epics/adaravis/_aravis_controller.py#L11
-TOMOGRAPHY_DETECTOR_DEADTIME = 2e-3 * 1.01
+# The tomography camera is an Alvium 1800 U-052, a different model from the
+# spectroscopy Manta, so these are deliberately NOT shared with
+# spectroscopy_plans - deadtime and readout pad are per camera model.
+#
+# TODO: both values below are placeholders carried over from the Manta and are
+# almost certainly too large for the Alvium. ophyd-async's table in
+# epics/adgenicam.py has no Alvium entry, and nothing cross-checks these
+# because AreaDetector.prepare uses the TriggerInfo we build rather than
+# calling get_deadtime(). Get the real figures from the Allied Vision
+# datasheet, or measure them.
+#
+# The error is in the safe direction - too long a period costs frame rate
+# rather than dropping frames - but it caps the minimum usable exposure at
+# ~2 ms, because livetime = exposure_time - deadtime must stay non-negative or
+# TriggerInfo rejects it.
+ALVIUM_ACQUIRE_PERIOD_PAD = 1961e-6
+ALVIUM_DETECTOR_DEADTIME = 2e-3 * 1.01
+
 TOMOGRAPHY_DETECTOR_TRIGGER = DetectorTrigger.EXTERNAL_EDGE
 
 # Maximum safe velocity of the rotation stage, in deg/s.
@@ -101,7 +108,7 @@ def tomography(
         *(tomography_detector.driver.acquire_time, exposure_time),
         *(
             tomography_detector.driver.acquire_period,
-            exposure_time + ARAVIS_ACQUIRE_PERIOD_PAD,
+            exposure_time + ALVIUM_ACQUIRE_PERIOD_PAD,
         ),
         group="tomography_detector_acquire",
     )
@@ -128,7 +135,7 @@ def tomography(
             pmac=pmac,
             pandabrick=pandabrick,
             exposure_time=exposure_time,
-            detector_deadtime=TOMOGRAPHY_DETECTOR_DEADTIME,
+            detector_deadtime=ALVIUM_DETECTOR_DEADTIME,
             detector_trigger=TOMOGRAPHY_DETECTOR_TRIGGER,
             panda_whitelist=PANDA_WHITELIST,
             plan_name="tomography_fly_scan",

@@ -26,14 +26,7 @@ from ophyd_async.epics.pmac import PmacIO
 from ophyd_async.fastcs.panda import HDFPanda
 from scanspec.specs import Line, Spec
 
-from .plans import (
-    ARAVIS_ACQUIRE_PERIOD_PAD,
-    fly_scan,
-    load_settings,
-    pandabrick,
-    pmac,
-    serialize_spec,
-)
+from .plans import fly_scan, load_settings, pandabrick, pmac, serialize_spec
 
 LOGGER = logging.getLogger(__name__)
 
@@ -43,6 +36,13 @@ sample_stage = inject("sample_stage")
 # The encoder entries map to specific axes, so despite the PandA being shared
 # hardware this list is spectroscopy's.
 PANDA_WHITELIST = ["incenc-3-val_dataset", "incenc-2-val_dataset"]
+
+# The spectroscopy camera is a Manta. Deadtime and readout pad are per camera
+# MODEL, not per camera family - ophyd-async keeps a table of them in
+# epics/adgenicam.py, where "Manta G-2460" is 1961e-6. Do not share these with
+# the tomography module, which has a different camera.
+MANTA_ACQUIRE_PERIOD_PAD = 1961e-6
+MANTA_DETECTOR_DEADTIME = 2e-3 * 1.01
 
 # Maximum safe velocity of the sample stage, in mm/s.
 MAX_STAGE_VELOCITY = 10.0
@@ -96,13 +96,15 @@ def spectroscopy(
     # outside of a run.
     # See: https://github.com/DiamondLightSource/blueapi/issues/1211
     #
-    # Deadtime taken from
-    # https://github.com/bluesky/ophyd-async/blob/15fa34b6ea2a28e2f27265a5564c9ee36423f1b7/src/ophyd_async/epics/adaravis/_aravis_controller.py#L11
+    # NOTE: on the fly path acquire_time is overwritten during prepare -
+    # AravisTriggerLogic.prepare_edge sets it to the TriggerInfo livetime, i.e.
+    # exposure_time minus the deadtime. This mv is what takes effect on the
+    # step path, and it is what sets acquire_period either way.
     yield from bps.mv(
         *(spectroscopy_detector.driver.acquire_time, exposure_time),
         *(
             spectroscopy_detector.driver.acquire_period,
-            exposure_time + ARAVIS_ACQUIRE_PERIOD_PAD,
+            exposure_time + MANTA_ACQUIRE_PERIOD_PAD,
         ),
         group="spectroscopy_detector_aquire",
     )
@@ -152,6 +154,7 @@ def spectroscopy(
             pmac=pmac,
             pandabrick=pandabrick,
             exposure_time=exposure_time,
+            detector_deadtime=MANTA_DETECTOR_DEADTIME,
             panda_whitelist=PANDA_WHITELIST,
             metadata=metadata,
         )
