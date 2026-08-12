@@ -8,7 +8,7 @@ rotation axis, the tomography detector, and their configuration.
 
 import logging
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any
 
 import bluesky.plan_stubs as bps
 import bluesky.preprocessors as bpp
@@ -23,6 +23,7 @@ from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.epics.motor import Motor
 from ophyd_async.epics.pmac import PmacIO
 from ophyd_async.fastcs.panda import HDFPanda
+from pydantic import Field
 from scanspec.specs import Line, Spec
 
 from .plans import fly_scan, load_settings, pandabrick, pmac, serialize_spec
@@ -57,6 +58,24 @@ class LightSource(StrEnum):
 # and is not a plan's to change.
 CALIBRATION_TYPE_KEY = "calibration_type"
 LIGHT_SOURCE_KEY = "light_source"
+
+# Bounds on how finely a scan may be sampled. Enforced by blueapi from the
+# parameter schema, so a frontend can read the limits rather than hardcode them.
+MIN_PROJECTIONS = 30
+MAX_PROJECTIONS = 1440
+
+NumProjections = Annotated[
+    int,
+    Field(
+        ge=MIN_PROJECTIONS,
+        le=MAX_PROJECTIONS,
+        description=(
+            "Number of projections over the angular range. Note that fewer "
+            "projections means a FASTER rotation for a given exposure time, "
+            "not a slower one."
+        ),
+    ),
+]
 
 
 # Hardware facts, so a blueapi user cannot get them wrong. exposure_time stays
@@ -200,7 +219,7 @@ def tomography(
     tomography_stage: Motor = tomography_stage,
     pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
-    num_projections: int = 360,
+    num_projections: NumProjections = 360,
     angular_range: float = 360.0,
     start_angle: float = 0.0,
     exposure_time: float = 0.1,
