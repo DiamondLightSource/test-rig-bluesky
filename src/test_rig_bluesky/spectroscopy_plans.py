@@ -1,9 +1,4 @@
-"""Bluesky plans for spectroscopy experiments.
-
-Shares the motion controller (PMAC) and the triggering / position-capture
-hardware (PandA) with the other experiment modules; everything
-experiment-agnostic lives in ``plans.py``.
-"""
+"""Bluesky plans for spectroscopy experiments."""
 
 import logging
 import math
@@ -91,11 +86,6 @@ def spectroscopy(
     # We call mv instead of prepare because prepare cannot technically be used
     # outside of a run.
     # See: https://github.com/DiamondLightSource/blueapi/issues/1211
-    #
-    # NOTE: on the fly path acquire_time is overwritten during prepare -
-    # AravisTriggerLogic.prepare_edge sets it to the TriggerInfo livetime, i.e.
-    # exposure_time minus the deadtime. This mv is what takes effect on the
-    # step path, and it is what sets acquire_period either way.
     yield from bps.mv(
         *(spectroscopy_detector.driver.acquire_time, exposure_time),
         *(
