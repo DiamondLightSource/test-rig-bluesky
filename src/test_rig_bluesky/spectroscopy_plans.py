@@ -37,10 +37,6 @@ sample_stage = inject("sample_stage")
 # hardware this list is spectroscopy's.
 PANDA_WHITELIST = ["incenc-3-val_dataset", "incenc-2-val_dataset"]
 
-# The spectroscopy camera is a Manta. Deadtime and readout pad are per camera
-# MODEL, not per camera family - ophyd-async keeps a table of them in
-# epics/adgenicam.py, where "Manta G-2460" is 1961e-6. Do not share these with
-# the tomography module, which has a different camera.
 MANTA_ACQUIRE_PERIOD_PAD = 1961e-6
 MANTA_DETECTOR_DEADTIME = 2e-3 * 1.01
 

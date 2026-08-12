@@ -38,8 +38,6 @@ from scanspec.specs import Fly, Spec
 
 LOGGER = logging.getLogger(__name__)
 
-# Shared hardware only. Experiment-specific devices are injected in the module
-# for that experiment, so that this one can be imported by both.
 pmac = inject("pmac")
 pandabrick = inject("pandabrick")
 
