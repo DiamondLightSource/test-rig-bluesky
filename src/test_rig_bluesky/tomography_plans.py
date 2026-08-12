@@ -111,7 +111,9 @@ def tomography(
         whitelist_pvs=TOMOGRAPHY_STAGE_WHITELIST,
     )
 
-    spec = spec or Line(tomography_stage, 0, 360, 360)  # type: ignore
+    # Half-open: 360 projections at 1 degree steps over [0, 360). See
+    # demo_tomography for why the endpoint is excluded.
+    spec = spec or Line(tomography_stage, 0, 359, 360)  # type: ignore
 
     if metadata is None:
         metadata = {}
@@ -156,7 +158,7 @@ def demo_tomography(
     Time taken is approximately linear in num_projections. All other
     parameters can be left at their defaults.
     """
-    stop_angle = start_angle + angular_range
+    angular_step = angular_range / num_projections
 
     velocity = angular_range / (num_projections * exposure_time)
     if velocity <= MAX_ROTATION_VELOCITY * 0.98:
@@ -177,14 +179,12 @@ def demo_tomography(
     # A single Line -- no product, no snake. Single-axis continuous rotation is
     # the easiest case for the trajectory: no turnarounds mid-scan.
     #
-    # NOTE: scanspec places these points INCLUSIVE of both endpoints, so the
-    # default Line(theta, 0, 360, 360) runs 0.0 to 360.0 in steps of 360/359,
-    # and the first and last projections are the same view. For a half-open
-    # range this should be
-    # Line(theta, start, stop - angular_range / num_projections, num),
-    # which for the defaults gives exactly 1 degree steps over [0, 360).
-    # TODO: confirm which convention the reconstruction expects.
-    scan = Line(tomography_stage, start_angle, stop_angle, num_projections)  # type: ignore
+    # scanspec's Line is inclusive of both endpoints, so the last projection is
+    # placed one step short of start + angular_range. Over a full turn that
+    # keeps the step a clean angular_range / num_projections and stops the
+    # first and last projections being the same view.
+    last_angle = start_angle + angular_range - angular_step
+    scan = Line(tomography_stage, start_angle, last_angle, num_projections)  # type: ignore
 
     yield from tomography(
         tomography_detector=tomography_detector,
