@@ -26,7 +26,14 @@ from ophyd_async.epics.pmac import PmacIO
 from ophyd_async.fastcs.panda import HDFPanda
 from scanspec.specs import Line, Spec
 
-from .plans import fly_scan, load_settings, pandabrick, pmac, serialize_spec
+from .plans import (
+    ARAVIS_ACQUIRE_PERIOD_PAD,
+    fly_scan,
+    load_settings,
+    pandabrick,
+    pmac,
+    serialize_spec,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -36,10 +43,6 @@ sample_stage = inject("sample_stage")
 # The encoder entries map to specific axes, so despite the PandA being shared
 # hardware this list is spectroscopy's.
 PANDA_WHITELIST = ["incenc-3-val_dataset", "incenc-2-val_dataset"]
-
-# Aravis requires acquire_period to exceed acquire_time by the sensor readout
-# time.
-ARAVIS_ACQUIRE_PERIOD_PAD = 1961e-6
 
 # Maximum safe velocity of the sample stage, in mm/s.
 MAX_STAGE_VELOCITY = 10.0

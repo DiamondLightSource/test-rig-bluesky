@@ -43,6 +43,11 @@ LOGGER = logging.getLogger(__name__)
 pmac = inject("pmac")
 pandabrick = inject("pandabrick")
 
+# Aravis requires acquire_period to exceed acquire_time by the sensor readout
+# time. Lives here because every camera on the rig is an Aravis; it is a
+# property of the camera family, not of either experiment.
+ARAVIS_ACQUIRE_PERIOD_PAD = 1961e-6
+
 
 def save_settings(
     device: Device,
