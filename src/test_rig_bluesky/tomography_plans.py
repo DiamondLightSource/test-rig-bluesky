@@ -7,13 +7,16 @@ rotation axis, the tomography detector, and their configuration.
 """
 
 import logging
+from enum import StrEnum
 from typing import Any
 
 import bluesky.plan_stubs as bps
 import bluesky.preprocessors as bpp
+from bluesky.plans import count
 from bluesky.protocols import Movable
 from bluesky.utils import MsgGenerator
 from dodal.common import inject
+from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from dodal.plans import spec_scan
 from ophyd_async.core import DetectorTrigger
 from ophyd_async.epics.adaravis import AravisDetector
@@ -30,6 +33,30 @@ LOGGER = logging.getLogger(__name__)
 # spectroscopy. Only the detector and the rotation axis are ours.
 tomography_detector = inject("tomography_detector")
 tomography_stage = inject("tomography_stage")
+
+
+class CalibrationType(StrEnum):
+    """Which kind of calibration image is being collected."""
+
+    FLAT = "flat"
+    """Beam on, sample out: the illumination profile to normalise against."""
+    DARK = "dark"
+    """Beam off: the detector's own offset and noise floor."""
+
+
+class LightSource(StrEnum):
+    """The illumination in use, so calibration images can be matched to scans."""
+
+    LED = "led"
+    SR = "sr"
+
+
+# Metadata keys the reconstruction workflow reads to pair projections with the
+# calibration images taken under the same illumination. The filename cannot
+# carry this: it comes from the path provider, which is built once per device
+# and is not a plan's to change.
+CALIBRATION_TYPE_KEY = "calibration_type"
+LIGHT_SOURCE_KEY = "light_source"
 
 
 # Hardware facts, so a blueapi user cannot get them wrong. exposure_time stays
@@ -77,7 +104,85 @@ TOMOGRAPHY_STAGE_WHITELIST = [
 PANDA_WHITELIST = ["incenc-1-val_dataset"]
 
 
+def _setup_detector(
+    detector: AravisDetector,
+    exposure_time: float,
+) -> MsgGenerator[None]:
+    """Put the detector in its scanning state.
+
+    Shared by the projections and the calibration images deliberately: flats
+    have to be taken at the same exposure, gain, binning and ROI as the
+    projections or the normalisation introduces artefacts that look like real
+    features. Routing both through here is what stops the two drifting apart.
+    """
+    yield from load_settings(
+        device=detector,
+        design_name="tomography_detector_baseline",
+        whitelist_pvs=DETECTOR_WHITELIST,
+    )
+
+    # mv rather than prepare, because prepare cannot be used outside a run.
+    # See: https://github.com/DiamondLightSource/blueapi/issues/1211
+    #
+    # NOTE: on the fly path acquire_time is overwritten during prepare -
+    # AravisTriggerLogic.prepare_edge sets it to the TriggerInfo livetime,
+    # i.e. exposure_time minus the deadtime. This mv is what takes effect for
+    # internally triggered collection, and it sets acquire_period either way.
+    yield from bps.mv(
+        *(detector.driver.acquire_time, exposure_time),
+        *(
+            detector.driver.acquire_period,
+            exposure_time + ALVIUM_ACQUIRE_PERIOD_PAD,
+        ),
+        group="tomography_detector_acquire",
+    )
+
+
+@attach_data_session_metadata_decorator()
+def collect_calibration_images(
+    calibration_type: CalibrationType,
+    light_source: LightSource,
+    tomography_detector: AravisDetector = tomography_detector,
+    num_images: int = 20,
+    exposure_time: float = 0.1,
+    metadata: dict[str, Any] | None = None,
+) -> MsgGenerator[None]:
+    """Collect flat or dark field images for the reconstruction to normalise with.
+
+    The two enums are recorded in the run's metadata under "calibration_type"
+    and "light_source" so the workflow can find the right images for a given
+    scan. Pass the same light_source you will pass to ``tomography``.
+
+    This plan does not operate the shutter, the LED or the sample stage - set
+    the beam and sample up for the kind of image you are taking before running
+    it. It only guarantees the detector is configured identically to the
+    projections, which is the part that is easy to get silently wrong.
+
+    Images are internally triggered: the PandA is not involved, and
+    ophyd-async turns external triggering off when preparing for a count.
+    """
+    yield from _setup_detector(tomography_detector, exposure_time)
+
+    LOGGER.info(
+        "Collecting %d %s images under %s illumination.",
+        num_images,
+        calibration_type.value,
+        light_source.value,
+    )
+
+    yield from count(
+        [tomography_detector],
+        num=num_images,
+        md={
+            CALIBRATION_TYPE_KEY: calibration_type.value,
+            LIGHT_SOURCE_KEY: light_source.value,
+            **(metadata or {}),
+        },
+    )
+
+
 def tomography(
+    light_source: LightSource,
     tomography_detector: AravisDetector = tomography_detector,
     tomography_stage: Motor = tomography_stage,
     pmac: PmacIO = pmac,
@@ -97,6 +202,10 @@ def tomography(
     the velocity, so an infeasible fly scan is rejected by the PMAC at prepare
     with a message naming the motor and its limit.
 
+    :param light_source: recorded in metadata so the reconstruction workflow
+        knows which calibration images to pair with these projections. It has
+        no default on purpose - guessing it wrong mislabels the data silently.
+
     :param spec: expert override. If given, the geometry parameters are ignored
         and the stage is neither moved to the start nor wound back afterwards,
         since the caller owns where the scan begins and ends.
@@ -105,22 +214,7 @@ def tomography(
     reconstruction workflow pairs them with these projections, so this plan
     does not record them.
     """
-    yield from load_settings(
-        device=tomography_detector,
-        design_name="tomography_detector_baseline",
-        whitelist_pvs=DETECTOR_WHITELIST,
-    )
-
-    # mv rather than prepare, because prepare cannot be used outside a run.
-    # See: https://github.com/DiamondLightSource/blueapi/issues/1211
-    yield from bps.mv(
-        *(tomography_detector.driver.acquire_time, exposure_time),
-        *(
-            tomography_detector.driver.acquire_period,
-            exposure_time + ALVIUM_ACQUIRE_PERIOD_PAD,
-        ),
-        group="tomography_detector_acquire",
-    )
+    yield from _setup_detector(tomography_detector, exposure_time)
 
     yield from load_settings(
         device=tomography_stage,
@@ -144,6 +238,8 @@ def tomography(
     if metadata is None:
         metadata = {}
     metadata["spec"] = serialize_spec(spec)
+    # Tells the workflow which calibration images belong with these projections.
+    metadata[LIGHT_SOURCE_KEY] = light_source.value
 
     def scan() -> MsgGenerator[None]:
         if fly:
