@@ -55,9 +55,6 @@ ALVIUM_DETECTOR_DEADTIME = 2e-3 * 1.01
 
 TOMOGRAPHY_DETECTOR_TRIGGER = DetectorTrigger.EXTERNAL_EDGE
 
-# Maximum safe velocity of the rotation stage, in deg/s.
-MAX_ROTATION_VELOCITY = 90.0
-
 # No roistat entries: tomography wants raw projections, not ROI sums, so the
 # NDAttribute plumbing from the spectroscopy plan is deliberately absent.
 DETECTOR_WHITELIST = [
@@ -85,12 +82,24 @@ def tomography(
     tomography_stage: Motor = tomography_stage,
     pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
-    spec: Spec[Movable] | None = None,
+    num_projections: int = 360,
+    angular_range: float = 360.0,
+    start_angle: float = 0.0,
     exposure_time: float = 0.1,
     fly: bool = True,
+    spec: Spec[Movable] | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> MsgGenerator[None]:
     """Do a tomography scan over the rotation axis.
+
+    Time taken is approximately linear in num_projections. Pass fly=False to
+    step through the projections instead of flying them; nothing here inspects
+    the velocity, so an infeasible fly scan is rejected by the PMAC at prepare
+    with a message naming the motor and its limit.
+
+    :param spec: expert override. If given, the geometry parameters are ignored
+        and the stage is neither moved to the start nor wound back afterwards,
+        since the caller owns where the scan begins and ends.
 
     Flat and dark fields are taken separately and live on the filesystem; the
     reconstruction workflow pairs them with these projections, so this plan
@@ -119,71 +128,6 @@ def tomography(
         whitelist_pvs=TOMOGRAPHY_STAGE_WHITELIST,
     )
 
-    # Half-open: 360 projections at 1 degree steps over [0, 360). See
-    # demo_tomography for why the endpoint is excluded.
-    spec = spec or Line(tomography_stage, 0, 359, 360)  # type: ignore
-
-    if metadata is None:
-        metadata = {}
-    metadata["spec"] = serialize_spec(spec)
-
-    if fly:
-        LOGGER.info("Performing a tomography fly scan.")
-        yield from fly_scan(
-            spec,
-            tomography_detector,
-            pmac=pmac,
-            pandabrick=pandabrick,
-            exposure_time=exposure_time,
-            detector_deadtime=ALVIUM_DETECTOR_DEADTIME,
-            detector_trigger=TOMOGRAPHY_DETECTOR_TRIGGER,
-            panda_whitelist=PANDA_WHITELIST,
-            plan_name="tomography_fly_scan",
-            metadata=metadata,
-        )
-    else:
-        LOGGER.info("Performing a tomography step scan.")
-        yield from spec_scan(
-            {tomography_detector, tomography_stage},
-            spec,  # type: ignore
-            metadata=metadata,
-        )
-
-
-def demo_tomography(
-    tomography_detector: AravisDetector = tomography_detector,
-    tomography_stage: Motor = tomography_stage,
-    pmac: PmacIO = pmac,
-    pandabrick: HDFPanda = pandabrick,
-    num_projections: int = 360,
-    angular_range: float = 360.0,
-    start_angle: float = 0.0,
-    exposure_time: float = 0.1,
-    metadata: dict[str, Any] | None = None,
-) -> MsgGenerator[None]:
-    """Tomography plan with sensible defaults, for demonstration use.
-
-    Time taken is approximately linear in num_projections. All other
-    parameters can be left at their defaults.
-    """
-    angular_step = angular_range / num_projections
-
-    velocity = angular_range / (num_projections * exposure_time)
-    if velocity <= MAX_ROTATION_VELOCITY * 0.98:
-        fly = True
-        LOGGER.info(
-            f"Estimated velocity is {velocity:.2f} deg/sec, performing a fly scan."
-        )
-    else:
-        fly = False
-        LOGGER.info(
-            f"Estimated velocity is {velocity:.2f} deg/sec, performing a step scan."
-        )
-
-    # PMAC handles the run-up, but move to the nominal start first so a
-    # failure here is reported before the trajectory is built.
-    yield from bps.mv(tomography_stage, start_angle, group="initial_move")
-
     # A single Line -- no product, no snake. Single-axis continuous rotation is
     # the easiest case for the trajectory: no turnarounds mid-scan.
     #
@@ -191,8 +135,49 @@ def demo_tomography(
     # placed one step short of start + angular_range. Over a full turn that
     # keeps the step a clean angular_range / num_projections and stops the
     # first and last projections being the same view.
-    last_angle = start_angle + angular_range - angular_step
-    scan = Line(tomography_stage, start_angle, last_angle, num_projections)  # type: ignore
+    caller_supplied_spec = spec is not None
+    if spec is None:
+        angular_step = angular_range / num_projections
+        last_angle = start_angle + angular_range - angular_step
+        spec = Line(tomography_stage, start_angle, last_angle, num_projections)  # type: ignore
+
+    if metadata is None:
+        metadata = {}
+    metadata["spec"] = serialize_spec(spec)
+
+    def scan() -> MsgGenerator[None]:
+        if fly:
+            LOGGER.info("Performing a tomography fly scan.")
+            yield from fly_scan(
+                spec,
+                tomography_detector,
+                pmac=pmac,
+                pandabrick=pandabrick,
+                exposure_time=exposure_time,
+                detector_deadtime=ALVIUM_DETECTOR_DEADTIME,
+                detector_trigger=TOMOGRAPHY_DETECTOR_TRIGGER,
+                panda_whitelist=PANDA_WHITELIST,
+                plan_name="tomography_fly_scan",
+                metadata=metadata,
+            )
+        else:
+            LOGGER.info("Performing a tomography step scan.")
+            yield from spec_scan(
+                {tomography_detector, tomography_stage},
+                spec,  # type: ignore
+                metadata=metadata,
+            )
+
+    if caller_supplied_spec:
+        # The caller owns the geometry, so we do not know where it starts or
+        # what it would mean to unwind to.
+        yield from scan()
+        return
+
+    # PMAC handles the run-up, but move to the nominal start first so a failure
+    # here is reported before the trajectory is built. This happens after the
+    # stage baseline is loaded so the move uses the baseline velocity.
+    yield from bps.mv(tomography_stage, start_angle, group="initial_move")
 
     def wind_back() -> MsgGenerator[None]:
         # The scan finishes near last_angle, plus whatever run-down the PMAC
@@ -202,16 +187,4 @@ def demo_tomography(
         # stops repeated scans accumulating cable wrap.
         yield from bps.mv(tomography_stage, start_angle, group="wind_back")
 
-    yield from bpp.finalize_wrapper(
-        tomography(
-            tomography_detector=tomography_detector,
-            tomography_stage=tomography_stage,
-            pmac=pmac,
-            pandabrick=pandabrick,
-            spec=scan,
-            exposure_time=exposure_time,
-            fly=fly,
-            metadata=metadata,
-        ),
-        wind_back,
-    )
+    yield from bpp.finalize_wrapper(scan(), wind_back)
