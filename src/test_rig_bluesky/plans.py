@@ -142,11 +142,9 @@ def fly_scan(
 
     # The trajectory and seq-table logics are bare FlyableLogic; wrap each in an
     # ephemeral StandardFlyable so the RunEngine can prepare/kickoff/complete it.
-    pmac_trigger_logic = PmacTrajectoryFlyableLogic(pmac).with_device(
-        name="pmac_trigger_logic"
-    )
-    panda_trigger_logic = ScanSpecSeqTableFlyableLogic(table).with_device(
-        name="panda_trigger_logic"
+    pmac_flyer = PmacTrajectoryFlyableLogic(pmac).with_device(name="pmac_flyer")
+    pandabrick_seq_flyer = ScanSpecSeqTableFlyableLogic(table).with_device(
+        name="pandabrick_seq_flyer"
     )
 
     scan_frame_livetime = scan_frame_duration - detector_deadtime
@@ -182,14 +180,12 @@ def fly_scan(
 
     @attach_data_session_metadata_decorator()
     @bpp.run_decorator(md=_md)
-    @bpp.stage_decorator(
-        [pandabrick, panda_trigger_logic, detector, pmac_trigger_logic]
-    )
+    @bpp.stage_decorator([pandabrick, pandabrick_seq_flyer, detector, pmac_flyer])
     def inner_plan():
         # Prepare pmac with the trajectory
-        yield from bps.prepare(pmac_trigger_logic, pmac_scan_info)
+        yield from bps.prepare(pmac_flyer, pmac_scan_info)
         # prepare sequencer table
-        yield from bps.prepare(panda_trigger_logic, scan_spec_info)
+        yield from bps.prepare(pandabrick_seq_flyer, scan_spec_info)
         # prepare panda and hdf writer once, at start of scan
         yield from bps.prepare(pandabrick, panda_hdf_info)
         # prepare detector and info
@@ -203,20 +199,20 @@ def fly_scan(
 
         # Start the detectors and hdf writers acquiring.
         # Configure the panda (seq table triggering).
-        # create a group that is waited for before pmac_trigger_logic kicked off on
+        # create a group that is waited for before pmac_flyer kicked off on
         # its own with wait=true.
         yield from bps.kickoff(pandabrick)
-        yield from bps.kickoff(panda_trigger_logic)
+        yield from bps.kickoff(pandabrick_seq_flyer)
         yield from bps.kickoff(detector, wait=True)
 
         # Start the trajectory.
-        yield from bps.kickoff(pmac_trigger_logic, wait=True)
+        yield from bps.kickoff(pmac_flyer, wait=True)
 
         # Wait for the scan to complete whilst continuously collecting the data.
         yield from bps.collect_while_completing(
             flyers=(
-                pmac_trigger_logic,
-                panda_trigger_logic,
+                pmac_flyer,
+                pandabrick_seq_flyer,
                 pandabrick,
                 detector,
             ),
