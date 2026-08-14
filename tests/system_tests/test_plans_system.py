@@ -4,7 +4,7 @@ from blueapi.service.model import TaskRequest
 from bluesky import RunEngine
 from scanspec.specs import Line
 
-from test_rig_bluesky.plans import spectroscopy
+from test_rig_bluesky.spectroscopy_plans import spectroscopy
 from test_rig_bluesky.testing import BlueskyPlanRunner
 
 
@@ -14,7 +14,12 @@ def test_snapshot(
     events = bluesky_plan_runner.run(
         TaskRequest(
             name="snapshot",
-            params={},
+            params={
+                "devices": [
+                    "spectroscopy_detector",
+                    "sample_stage",
+                ]
+            },
             instrument_session=latest_commissioning_instrument_session,
         ),
         timeout=10,
@@ -90,7 +95,7 @@ def test_generic_count(
         TaskRequest(
             name="count",
             params={
-                "detectors": ["imaging_detector", "spectroscopy_detector"],
+                "detectors": ["spectroscopy_detector"],
                 "num": 5,
             },
             instrument_session=latest_commissioning_instrument_session,
@@ -109,7 +114,7 @@ def test_generic_scan(
         TaskRequest(
             name="spec_scan",
             params={
-                "detectors": ["imaging_detector", "spectroscopy_detector"],
+                "detectors": ["spectroscopy_detector"],
                 "spec": scan_spec.serialize(),
             },
             instrument_session=latest_commissioning_instrument_session,
@@ -121,9 +126,15 @@ def test_generic_scan(
 @pytest.mark.control_system
 def test_spectroscopy_re():
     run_engine = RunEngine()
-    spectroscopy_detector = b01_1.spectroscopy_detector(connect_immediately=True)
-    sample_stage = b01_1.sample_stage(connect_immediately=True)
+    spectroscopy_detector = b01_1.spectroscopy_detector.build(connect_immediately=True)
+    sample_stage = b01_1.sample_stage.build(connect_immediately=True)
 
     scan_spec = Line(sample_stage.y, 0, 5, 50) * Line(sample_stage.x, 2, 5, 30)
 
-    run_engine(spectroscopy(spectroscopy_detector, sample_stage, scan_spec))
+    run_engine(
+        spectroscopy(
+            spectroscopy_detector=spectroscopy_detector,
+            sample_stage=sample_stage,
+            spec=scan_spec,
+        )
+    )
