@@ -10,7 +10,6 @@ from bluesky.plans import count
 from bluesky.protocols import Movable
 from bluesky.utils import MsgGenerator
 from dodal.common import inject
-from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from dodal.plans import spec_scan
 from ophyd_async.core import DetectorTrigger
 from ophyd_async.epics.adaravis import AravisDetector
@@ -54,10 +53,9 @@ NumProjections = Annotated[
 ]
 
 
-# TODO: both values below are placeholders carried over from the Manta and are
-# almost certainly too large for the Alvium. Get real figures from datasheet
-ALVIUM_ACQUIRE_PERIOD_PAD = 1961e-6
-ALVIUM_DETECTOR_DEADTIME = 2e-3 * 1.01
+# TODO: conservative estimates for now
+MAKO_ACQUIRE_PERIOD_PAD = 25e-3
+MAKO_DETECTOR_DEADTIME = 25e-3
 
 TOMOGRAPHY_DETECTOR_TRIGGER = DetectorTrigger.EXTERNAL_EDGE
 
@@ -95,14 +93,14 @@ def _setup_detector(
         *(detector.driver.acquire_time, exposure_time),
         *(
             detector.driver.acquire_period,
-            exposure_time + ALVIUM_ACQUIRE_PERIOD_PAD,
+            exposure_time + MAKO_ACQUIRE_PERIOD_PAD,
         ),
         group="tomography_detector_acquire",
     )
 
 
-@attach_data_session_metadata_decorator()
-def collect_calibration_images(
+# @attach_data_session_metadata_decorator()
+def darks_flats(
     light_source: LightSource,
     tomography_detector: AravisDetector = tomography_detector,
     num_images: int = 20,
@@ -141,7 +139,7 @@ def tomography(
     tomography_stage: Motor = tomography_stage,
     pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
-    num_projections: NumProjections = 360,
+    number_of_projections: NumProjections = 360,
     angular_range: float = 360.0,
     start_angle: float = 0.0,
     exposure_time: float = 0.1,
@@ -160,9 +158,9 @@ def tomography(
 
     caller_supplied_spec = spec is not None
     if spec is None:
-        angular_step = angular_range / num_projections
+        angular_step = angular_range / number_of_projections
         last_angle = start_angle + angular_range - angular_step
-        spec = Line(tomography_stage, start_angle, last_angle, num_projections)  # type: ignore
+        spec = Line(tomography_stage, start_angle, last_angle, number_of_projections)  # type: ignore
 
     if metadata is None:
         metadata = {}
@@ -179,7 +177,7 @@ def tomography(
                 pmac=pmac,
                 pandabrick=pandabrick,
                 exposure_time=exposure_time,
-                detector_deadtime=ALVIUM_DETECTOR_DEADTIME,
+                detector_deadtime=MAKO_DETECTOR_DEADTIME,
                 detector_trigger=TOMOGRAPHY_DETECTOR_TRIGGER,
                 panda_whitelist=PANDA_WHITELIST,
                 plan_name="tomography_fly_scan",

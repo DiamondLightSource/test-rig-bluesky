@@ -9,7 +9,8 @@ from bluesky.plans import count
 from bluesky.protocols import Movable, Readable
 from bluesky.utils import MsgGenerator
 from dodal.common import inject
-from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
+
+# from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from ophyd_async.core import (
     DetectorTrigger,
     Device,
@@ -100,7 +101,7 @@ def serialize_spec(spec: Spec[Any]) -> Any:
     return TypeAdapter(Spec[Any]).dump_python(spec, mode="json", fallback=repr)
 
 
-@attach_data_session_metadata_decorator()
+# @attach_data_session_metadata_decorator()
 def snapshot(devices: list[Readable]) -> MsgGenerator[None]:
     """Capture a snapshot of the current state of the given devices.
 
@@ -178,7 +179,7 @@ def fly_scan(
         deadtime=detector_deadtime,
     )
 
-    @attach_data_session_metadata_decorator()
+    # @attach_data_session_metadata_decorator()
     @bpp.run_decorator(md=_md)
     @bpp.stage_decorator([pandabrick, pandabrick_seq_flyer, detector, pmac_flyer])
     def inner_plan():
