@@ -1,0 +1,8 @@
+acceleration_time: 0.001
+high_limit_travel: 1000
+low_limit_travel: -1000
+offset: 0.0
+offset_freeze_switch: Variable
+set_use_switch: Use
+user_setpoint: 5.00004
+velocity: 30
