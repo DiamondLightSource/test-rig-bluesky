@@ -36,9 +36,8 @@ class BlueskyPlanRunner:
         self.stomp_client.subscribe(MessageTopic(name="gda.messages.scan"), collect)
 
         # Run plan
-        end_event = self.client.run_task(task_request, timeout=timeout)
-        assert end_event.task_status is not None
-        task_id = end_event.task_status.task_id
+        task_status = self.client.run_task(task_request, timeout=timeout)
+        task_id = task_status.task_id
 
         # Check task ran and did not error
         task = self.client.get_task(task_id)
