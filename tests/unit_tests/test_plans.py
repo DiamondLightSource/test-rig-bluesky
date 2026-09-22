@@ -9,6 +9,7 @@ from bluesky import RunEngine
 from dodal.devices.motors import XYZStage
 from ophyd_async.core import callback_on_mock_put, set_mock_value
 from ophyd_async.epics.adaravis import AravisDetector
+from ophyd_async.epics.adcore import NDFileHDF5IO
 from ophyd_async.fastcs.panda import HDFPanda
 from ophyd_async.testing import assert_emitted
 from scanspec.specs import Line
@@ -49,21 +50,23 @@ def pandabrick(run_engine: RunEngine) -> HDFPanda:
 
 
 def _mock_detector_behavior(detector: AravisDetector) -> None:
+    hdf = detector.get_plugin("hdf", NDFileHDF5IO)
+
     async def mock_acquisition() -> None:
         # Get number of images to capture per acquire
         num_images = await detector.driver.num_images.get_value()
-        set_mock_value(detector.hdf.num_capture, num_images)
+        set_mock_value(hdf.num_capture, num_images)
 
         # Increment from current num captured to new value
-        current_num_captured = await detector.hdf.num_captured.get_value()
+        current_num_captured = await hdf.num_captured.get_value()
         for i in range(current_num_captured, current_num_captured + num_images + 1):
-            set_mock_value(detector.hdf.num_captured, i)
+            set_mock_value(hdf.num_captured, i)
 
     async def on_acquire(acquire: bool) -> None:
         if acquire:
             asyncio.create_task(mock_acquisition())
 
-    set_mock_value(detector.hdf.file_path_exists, True)
+    set_mock_value(hdf.file_path_exists, True)
     callback_on_mock_put(detector.driver.acquire, on_acquire)
 
 
