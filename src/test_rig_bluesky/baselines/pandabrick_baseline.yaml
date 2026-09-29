@@ -202,7 +202,7 @@ counter.1.out_dataset: ""
 counter.1.out_mode: On-Change
 counter.1.out_offset: 0.0
 counter.1.out_scale: 0.0
-counter.1.set: 0
+counter.1.set_: 0
 counter.1.start: 0
 counter.1.step: 0
 counter.1.trig: TTLIN1.VAL
@@ -220,7 +220,7 @@ counter.2.out_dataset: ""
 counter.2.out_mode: On-Change
 counter.2.out_offset: 0.0
 counter.2.out_scale: 0.0
-counter.2.set: 0
+counter.2.set_: 0
 counter.2.start: 0
 counter.2.step: 0
 counter.2.trig: TTLIN1.VAL
@@ -238,7 +238,7 @@ counter.3.out_dataset: ""
 counter.3.out_mode: On-Change
 counter.3.out_offset: 0.0
 counter.3.out_scale: 0.0
-counter.3.set: 0
+counter.3.set_: 0
 counter.3.start: 0
 counter.3.step: 0
 counter.3.trig: TTLIN1.VAL
@@ -256,7 +256,7 @@ counter.4.out_dataset: ""
 counter.4.out_mode: On-Change
 counter.4.out_offset: 0.0
 counter.4.out_scale: 0.0
-counter.4.set: 0
+counter.4.set_: 0
 counter.4.start: 0
 counter.4.step: 0
 counter.4.trig: TTLIN1.VAL
@@ -737,7 +737,7 @@ srgate.1.out_capture: false
 srgate.1.rst: TTLIN1.VAL
 srgate.1.rst_delay: 0
 srgate.1.rst_edge: Rising
-srgate.1.set: TTLIN1.VAL
+srgate.1.set_: TTLIN1.VAL
 srgate.1.set_delay: 0
 srgate.1.set_edge: Rising
 srgate.1.when_disabled: Set output low
@@ -747,7 +747,7 @@ srgate.2.out_capture: false
 srgate.2.rst: TTLIN1.VAL
 srgate.2.rst_delay: 0
 srgate.2.rst_edge: Rising
-srgate.2.set: TTLIN1.VAL
+srgate.2.set_: TTLIN1.VAL
 srgate.2.set_delay: 0
 srgate.2.set_edge: Rising
 srgate.2.when_disabled: Set output low
@@ -757,7 +757,7 @@ srgate.3.out_capture: false
 srgate.3.rst: TTLIN1.VAL
 srgate.3.rst_delay: 0
 srgate.3.rst_edge: Rising
-srgate.3.set: TTLIN1.VAL
+srgate.3.set_: TTLIN1.VAL
 srgate.3.set_delay: 0
 srgate.3.set_edge: Rising
 srgate.3.when_disabled: Set output low
@@ -767,7 +767,7 @@ srgate.4.out_capture: false
 srgate.4.rst: TTLIN1.VAL
 srgate.4.rst_delay: 0
 srgate.4.rst_edge: Rising
-srgate.4.set: TTLIN1.VAL
+srgate.4.set_: TTLIN1.VAL
 srgate.4.set_delay: 0
 srgate.4.set_edge: Rising
 srgate.4.when_disabled: Set output low
