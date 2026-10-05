@@ -1,0 +1,70 @@
+driver.acquire: false
+driver.acquire_period: 0.021815
+driver.acquire_time: 0.10000
+driver.array_counter: 3
+driver.image_mode: Multiple
+driver.nd_attributes_file: ""
+driver.num_images: 1
+driver.trigger_mode: "Off"
+driver.trigger_source: Freerun
+driver.wait_for_plugins: false
+hdf.array_counter: 3
+hdf.auto_increment: true
+hdf.capture: false
+hdf.chunk_size_auto: true
+hdf.compression: None
+hdf.create_directory: 0
+hdf.enable_callbacks: Enable
+hdf.file_name: 5073260b-9688-4283-84d1-204955e423aa
+hdf.file_number: 1
+hdf.file_path: /tmp/
+hdf.file_template: "%s%s.h5"
+hdf.file_write_mode: Stream
+hdf.flush_now: false
+hdf.lazy_open: true
+hdf.nd_array_address: 0
+hdf.nd_array_port: D2.ROISTAT
+hdf.nd_attributes_file: ""
+hdf.num_capture: 0
+hdf.num_extra_dims: 0
+hdf.num_frames_chunks: 1
+hdf.position_mode: false
+hdf.queue_size: 2
+hdf.swmr_mode: true
+hdf.xml_file_name: ""
+roistat.array_counter: 3
+roistat.channels.1.min_x: 295
+roistat.channels.1.min_y: 114
+roistat.channels.1.name_: Blue
+roistat.channels.1.size_x: 150
+roistat.channels.1.size_y: 150
+roistat.channels.1.use: true
+roistat.channels.2.min_x: 907
+roistat.channels.2.min_y: 108
+roistat.channels.2.name_: Green
+roistat.channels.2.size_x: 150
+roistat.channels.2.size_y: 150
+roistat.channels.2.use: true
+roistat.channels.3.min_x: 1511
+roistat.channels.3.min_y: 104
+roistat.channels.3.name_: Red
+roistat.channels.3.size_x: 150
+roistat.channels.3.size_y: 150
+roistat.channels.3.use: true
+roistat.enable_callbacks: Enable
+roistat.nd_array_address: 0
+roistat.nd_array_port: D2.DRV
+roistat.nd_attributes_file: <Attributes><Attribute
+  name="&lt;ophyd_async.core._signal.SignalRW object at 0x7ff2db389990&gt;Total"
+  type="EPICS_PV" source="BL01C-DI-DCAM-02:ROISTAT:1:Total_RBV"
+  dbrtype="DBR_LONG" description="Sum of &lt;ophyd_async.core._signal.SignalRW
+  object at 0x7ff2db389990&gt; channel" /><Attribute
+  name="&lt;ophyd_async.core._signal.SignalRW object at 0x7ff2db38bb10&gt;Total"
+  type="EPICS_PV" source="BL01C-DI-DCAM-02:ROISTAT:2:Total_RBV"
+  dbrtype="DBR_LONG" description="Sum of &lt;ophyd_async.core._signal.SignalRW
+  object at 0x7ff2db38bb10&gt; channel" /><Attribute
+  name="&lt;ophyd_async.core._signal.SignalRW object at 0x7ff2db39d3d0&gt;Total"
+  type="EPICS_PV" source="BL01C-DI-DCAM-02:ROISTAT:3:Total_RBV"
+  dbrtype="DBR_LONG" description="Sum of &lt;ophyd_async.core._signal.SignalRW
+  object at 0x7ff2db39d3d0&gt; channel" /></Attributes>
+roistat.queue_size: 2

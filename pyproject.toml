@@ -19,7 +19,7 @@ requires-python = ">=3.11"
 
 [project.optional-dependencies]
 dev = [
-    "blueapi>=1.3.1",
+    "blueapi>=1.12.0",
     "copier",
     "pipdeptree",
     "pre-commit",
@@ -42,6 +42,11 @@ GitHub = "https://github.com/DiamondLightSource/test-rig-bluesky"
 email = "douglas.winter@diamond.ac.uk"
 name = "Douglas Winter"
 
+
+[tool.setuptools.package-data]
+# Baseline device settings are loaded at runtime by plans._settings_provider,
+# so they must ship with the package, not just live in the source tree.
+test_rig_bluesky = ["baselines/*.yaml"]
 
 [tool.setuptools_scm]
 version_file = "src/test_rig_bluesky/_version.py"
