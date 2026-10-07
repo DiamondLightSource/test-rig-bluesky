@@ -12,11 +12,12 @@ from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.epics.adcore import NDFileHDF5IO
 from ophyd_async.fastcs.panda import HDFPanda
 from ophyd_async.testing import assert_emitted
-from scanspec.specs import Line
+from scanspec.specs import Line, Spec
 
 from test_rig_bluesky.plans import (
     load_settings,
     save_settings,
+    serialize_spec,
     snapshot,
 )
 from test_rig_bluesky.spectroscopy_plans import demo_spectroscopy, spectroscopy
@@ -271,3 +272,16 @@ def test_demo_spectroscopy():
     assert called_kwargs["spec"] == Line(fake_stage.y, 0.0, 5.0, 5) * ~Line(
         fake_stage.x, 0.0, 5.0, 5
     )
+
+
+def test_serialize_spec_names_device_axes(sample_stage: XYZStage):
+    spec = Line(sample_stage.y, 4.2, 6, 3) * Line(sample_stage.x, 0, 5, 10)
+
+    serialized = serialize_spec(spec)
+
+    assert serialized["outer"]["axis"] == sample_stage.y.name
+    assert serialized["inner"]["axis"] == sample_stage.x.name
+    assert Spec.deserialize(serialized).axes() == [
+        sample_stage.y.name,
+        sample_stage.x.name,
+    ]
