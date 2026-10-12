@@ -19,7 +19,7 @@ from ophyd_async.fastcs.panda import HDFPanda
 from pydantic import Field
 from scanspec.specs import Line, Spec
 
-from .plans import fly_scan, load_settings, pandabrick, pmac, serialize_spec
+from .plans import ScanType, fly_scan, load_settings, pandabrick, pmac, serialize_spec
 
 LOGGER = logging.getLogger(__name__)
 
@@ -37,8 +37,9 @@ class LightSource(StrEnum):
 
 
 # Metadata keys the reconstruction workflow reads to pair projections with the
-# calibration images taken under the same illumination
+# calibration images taken under the same illumination and exposure
 LIGHT_SOURCE_KEY = "light_source"
+EXPOSURE_TIME_KEY = "exposure_time"
 
 MIN_PROJECTIONS = 30
 MAX_PROJECTIONS = 1440
@@ -54,8 +55,8 @@ NumProjections = Annotated[
 
 
 # TODO: conservative estimates for now
-MAKO_ACQUIRE_PERIOD_PAD = 25e-3
-MAKO_DETECTOR_DEADTIME = 25e-3
+ALVIUM_ACQUIRE_PERIOD_PAD = 25e-3
+ALVIUM_DETECTOR_DEADTIME = 25e-3
 
 TOMOGRAPHY_DETECTOR_TRIGGER = DetectorTrigger.EXTERNAL_EDGE
 
@@ -93,7 +94,7 @@ def _setup_detector(
         *(detector.driver.acquire_time, exposure_time),
         *(
             detector.driver.acquire_period,
-            exposure_time + MAKO_ACQUIRE_PERIOD_PAD,
+            exposure_time + ALVIUM_ACQUIRE_PERIOD_PAD,
         ),
         group="tomography_detector_acquire",
     )
@@ -109,15 +110,13 @@ def darks_flats(
 ) -> MsgGenerator[None]:
     """Collect flat or dark field images for the reconstruction to normalise with.
 
-    Recorded in the run's metadata under "light_source" so the workflow can find
-    the right images for a given scan. LightSource.NONE means the beam is off,
-    i.e. dark fields, and one such set serves every illumination.
-
-    :param light_source: illumination the images are taken under, or
-        LightSource.NONE for dark fields.
-    """
-    run_metadata: dict[str, Any] = {LIGHT_SOURCE_KEY: light_source.value}
-    run_metadata.update(metadata or {})
+    Recorded in the run's metadata under "light_source" and "exposure_time" so
+    the workflow can find the right images for a given scan."""
+    run_metadata: dict[str, Any] = {
+        **(metadata or {}),
+        LIGHT_SOURCE_KEY: light_source.value,
+        EXPOSURE_TIME_KEY: exposure_time,
+    }
 
     if light_source is LightSource.DARK:
         LOGGER.info("Collecting %d dark images.", num_images)
@@ -134,6 +133,7 @@ def darks_flats(
 
 
 def tomography(
+    scan_type: ScanType,
     light_source: LightSource,
     tomography_detector: AravisDetector = tomography_detector,
     tomography_stage: Motor = tomography_stage,
@@ -143,11 +143,13 @@ def tomography(
     angular_range: float = 360.0,
     start_angle: float = 0.0,
     exposure_time: float = 0.1,
-    fly: bool = True,
     spec: Spec[Movable] | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> MsgGenerator[None]:
     """Do a tomography scan."""
+    if light_source is LightSource.DARK:
+        raise ValueError("Cannot run a tomography scan with the light source off.")
+
     yield from _setup_detector(tomography_detector, exposure_time)
 
     yield from load_settings(
@@ -162,14 +164,17 @@ def tomography(
         last_angle = start_angle + angular_range - angular_step
         spec = Line(tomography_stage, start_angle, last_angle, number_of_projections)  # type: ignore
 
-    if metadata is None:
-        metadata = {}
-    metadata["spec"] = serialize_spec(spec)
-    # Tells the workflow which calibration images belong with these projections.
-    metadata[LIGHT_SOURCE_KEY] = light_source.value
+    # Tells the workflow which calibration images (light source & exposure time) belong
+    # with these projections.
+    scan_metadata: dict[str, Any] = {
+        **(metadata or {}),
+        "spec": serialize_spec(spec),
+        LIGHT_SOURCE_KEY: light_source.value,
+        EXPOSURE_TIME_KEY: exposure_time,
+    }
 
     def scan() -> MsgGenerator[None]:
-        if fly:
+        if scan_type is ScanType.FLY:
             LOGGER.info("Performing a tomography fly scan.")
             yield from fly_scan(
                 spec,
@@ -177,18 +182,18 @@ def tomography(
                 pmac=pmac,
                 pandabrick=pandabrick,
                 exposure_time=exposure_time,
-                detector_deadtime=MAKO_DETECTOR_DEADTIME,
+                detector_deadtime=ALVIUM_DETECTOR_DEADTIME,
                 detector_trigger=TOMOGRAPHY_DETECTOR_TRIGGER,
                 panda_whitelist=PANDA_WHITELIST,
                 plan_name="tomography_fly_scan",
-                metadata=metadata,
+                metadata=scan_metadata,
             )
-        else:
+        elif scan_type is ScanType.STEP:
             LOGGER.info("Performing a tomography step scan.")
             yield from spec_scan(
                 {tomography_detector, tomography_stage},
                 spec,  # type: ignore
-                metadata=metadata,
+                metadata=scan_metadata,
             )
 
     if caller_supplied_spec:
