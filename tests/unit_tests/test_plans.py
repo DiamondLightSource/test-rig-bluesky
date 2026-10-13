@@ -1,5 +1,4 @@
 import asyncio
-import unittest.mock
 from collections import defaultdict
 from unittest.mock import ANY, AsyncMock, Mock, patch
 
@@ -7,7 +6,10 @@ import dodal.beamlines.b01_1 as b01_1
 import pytest
 from bluesky import RunEngine
 from dodal.devices.motors import XYZStage
-from ophyd_async.core import callback_on_mock_put, set_mock_value
+from ophyd_async.core import (
+    callback_on_mock_put,
+    set_mock_value,
+)
 from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.epics.adcore import NDFileHDF5IO
 from ophyd_async.fastcs.panda import HDFPanda
@@ -20,7 +22,6 @@ from test_rig_bluesky.plans import (
     serialize_spec,
     snapshot,
 )
-from test_rig_bluesky.spectroscopy_plans import demo_spectroscopy, spectroscopy
 
 
 @pytest.fixture
@@ -134,144 +135,6 @@ def test_snapshot(
         "sample_stage-y": 0.0,
         "sample_stage-z": 0.0,
     }
-
-
-async def test_spectroscopy(
-    run_engine: RunEngine,
-    spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
-    pandabrick: HDFPanda,
-):
-    docs = defaultdict(list)
-    run_engine.subscribe(lambda name, doc: docs[name].append(doc))
-
-    run_engine(
-        spectroscopy(
-            spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
-            pandabrick=pandabrick,
-            spec=Line(sample_stage.y, 4.2, 6, 3) * Line(sample_stage.x, 0, 5, 10),
-            exposure_time=0.2,
-            fly=False,
-        )
-    )
-
-    assert await spectroscopy_detector.driver.acquire_time.get_value() == 0.2
-
-    assert_emitted(
-        docs,
-        start=1,
-        descriptor=1,
-        stream_resource=4,
-        stream_datum=4 * 30,
-        event=30,
-        stop=1,
-    )
-
-
-async def test_spectroscopy_defaults(
-    run_engine: RunEngine,
-    spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
-    pandabrick: HDFPanda,
-):
-    docs = defaultdict(list)
-    run_engine.subscribe(lambda name, doc: docs[name].append(doc))
-
-    run_engine(
-        spectroscopy(
-            spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
-            pandabrick=pandabrick,
-            fly=False,
-        )
-    )
-
-    assert await spectroscopy_detector.driver.acquire_time.get_value() == 0.1
-
-    assert_emitted(
-        docs,
-        start=1,
-        descriptor=1,
-        stream_resource=4,
-        stream_datum=4 * 5,
-        event=5,
-        stop=1,
-    )
-
-
-def test_spectroscopy_datasets(
-    run_engine: RunEngine,
-    spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
-    pandabrick: HDFPanda,
-):
-    docs = defaultdict(list)
-    run_engine.subscribe(lambda name, doc: docs[name].append(doc))
-
-    run_engine(
-        spectroscopy(
-            spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
-            pandabrick=pandabrick,
-            fly=False,
-        )
-    )
-
-    data_keys = [resource.get("data_key") for resource in docs["stream_resource"]]
-    assert data_keys == ["spectroscopy_detector", "BlueTotal", "GreenTotal", "RedTotal"]
-    assert docs["event"][0]["data"] == {
-        "sample_stage-x": 0.0,
-        "sample_stage-y": 0.0,
-        "sample_stage-z": 0.0,
-    }
-
-
-async def test_spectroscopy_sets_exposure_time_and_acquire_period(
-    run_engine: RunEngine,
-    spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
-    pandabrick: HDFPanda,
-):
-    run_engine(
-        spectroscopy(
-            spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
-            pandabrick=pandabrick,
-            exposure_time=1.0,
-            fly=False,
-        )
-    )
-    assert await spectroscopy_detector.driver.acquire_time.get_value() == 1.0
-    assert (
-        await spectroscopy_detector.driver.acquire_period.get_value() == 1.0 + 1961e-6
-    )
-
-
-def test_demo_spectroscopy():
-    fake_detector = unittest.mock.MagicMock(name="fake_detector")
-    fake_stage = unittest.mock.MagicMock(name="fake_stage")
-    with unittest.mock.patch(
-        "test_rig_bluesky.spectroscopy_plans.spectroscopy"
-    ) as mock_spec:
-        # Call the generator function and exhaust it
-        generator = demo_spectroscopy(
-            spectroscopy_detector=fake_detector,
-            sample_stage=fake_stage,
-            total_number_of_scan_points=25,
-        )
-
-        # Consume the generator so that the spectroscopy call is made
-        for _ in generator:
-            pass
-
-    mock_spec.assert_called_once()
-    called_kwargs = mock_spec.call_args.kwargs
-    assert called_kwargs["spectroscopy_detector"] is fake_detector
-    assert called_kwargs["sample_stage"] is fake_stage
-    assert called_kwargs["spec"] == Line(fake_stage.y, 0.0, 5.0, 5) * ~Line(
-        fake_stage.x, 0.0, 5.0, 5
-    )
 
 
 def test_serialize_spec_names_device_axes(sample_stage: XYZStage):

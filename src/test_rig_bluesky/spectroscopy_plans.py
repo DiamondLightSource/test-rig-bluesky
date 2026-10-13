@@ -8,6 +8,7 @@ import bluesky.plan_stubs as bps
 from bluesky.protocols import Movable
 from bluesky.utils import MsgGenerator
 from dodal.common import inject
+from dodal.devices.beamlines.b01_1.diodes import RGBDiodes
 from dodal.devices.motors import XYZStage
 from dodal.plans import spec_scan
 from ophyd_async.epics.adaravis import AravisDetector
@@ -26,6 +27,8 @@ from .plans import fly_scan, load_settings, pandabrick, pmac, serialize_spec
 LOGGER = logging.getLogger(__name__)
 
 spectroscopy_detector = inject("spectroscopy_detector")
+spectroscopy_diodes = inject("spectroscopy_diodes")
+pandabox = inject("pandabox")
 sample_stage = inject("sample_stage")
 
 # The encoder entries map to specific axes, so despite the PandA being shared
@@ -44,12 +47,18 @@ def spectroscopy(
     sample_stage: XYZStage = sample_stage,
     pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
+    pandabox: HDFPanda = pandabox,
+    spectroscopy_diodes: RGBDiodes = spectroscopy_diodes,
     spec: Spec[Movable] | None = None,
     exposure_time: float = 0.1,
     fly: bool = True,
+    gain: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> MsgGenerator[None]:
-    """Do a spectroscopy scan."""
+    """Do a spectroscopy scan, acquiring from the camera and the RGB diodes."""
+    if gain is not None:
+        yield from bps.abs_set(spectroscopy_diodes.gain, gain, wait=True)
+
     yield from load_settings(
         device=spectroscopy_detector,
         design_name="spectroscopy_detector_baseline",
@@ -143,11 +152,13 @@ def spectroscopy(
             detector_deadtime=MANTA_DETECTOR_DEADTIME,
             panda_whitelist=PANDA_WHITELIST,
             metadata=metadata,
+            pandabox=pandabox,
+            diodes=spectroscopy_diodes,
         )
     else:
         LOGGER.info("Performing a step scan.")
         yield from spec_scan(
-            {spectroscopy_detector, sample_stage},
+            {spectroscopy_detector, spectroscopy_diodes, sample_stage},
             spec,  # type: ignore
             metadata=metadata,
         )
@@ -158,6 +169,8 @@ def demo_spectroscopy(
     sample_stage: XYZStage = sample_stage,
     pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
+    pandabox: HDFPanda = pandabox,
+    spectroscopy_diodes: RGBDiodes = spectroscopy_diodes,
     total_number_of_scan_points: int = 25,
     grid_size: float = 5.0,
     grid_origin_x: float = 0.0,
@@ -205,6 +218,8 @@ def demo_spectroscopy(
         sample_stage=sample_stage,
         pmac=pmac,
         pandabrick=pandabrick,
+        pandabox=pandabox,
+        spectroscopy_diodes=spectroscopy_diodes,
         spec=grid,
         exposure_time=exposure_time,
         fly=fly,
