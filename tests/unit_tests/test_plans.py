@@ -5,6 +5,8 @@ from unittest.mock import ANY, AsyncMock, Mock, patch
 import dodal.beamlines.b01_1 as b01_1
 import pytest
 from bluesky import RunEngine
+from dodal.devices.beamlines.b01_1.diodes import RGBDiodes
+from dodal.devices.current_amplifiers import EnzLocumRange
 from dodal.devices.motors import XYZStage
 from ophyd_async.core import (
     callback_on_mock_put,
@@ -22,6 +24,7 @@ from test_rig_bluesky.plans import (
     serialize_spec,
     snapshot,
 )
+from test_rig_bluesky.spectroscopy_plans import spectroscopy
 
 
 @pytest.fixture
@@ -49,6 +52,11 @@ def sample_stage(run_engine: RunEngine) -> XYZStage:
 @pytest.fixture
 def pandabrick(run_engine: RunEngine) -> HDFPanda:
     return b01_1.pandabrick.build(connect_immediately=True, mock=True)
+
+
+@pytest.fixture
+def spectroscopy_diodes(run_engine: RunEngine) -> RGBDiodes:
+    return b01_1.spectroscopy_diodes.build(connect_immediately=True, mock=True)
 
 
 def _mock_detector_behavior(detector: AravisDetector) -> None:
@@ -148,3 +156,33 @@ def test_serialize_spec_names_device_axes(sample_stage: XYZStage):
         sample_stage.y.name,
         sample_stage.x.name,
     ]
+
+
+async def test_spectroscopy_with_diodes(
+    run_engine: RunEngine,
+    spectroscopy_detector: AravisDetector,
+    sample_stage: XYZStage,
+    pandabrick: HDFPanda,
+    spectroscopy_diodes: RGBDiodes,
+):
+    docs = defaultdict(list)
+    run_engine.subscribe(lambda name, doc: docs[name].append(doc))
+
+    run_engine(
+        spectroscopy(
+            spectroscopy_detector=spectroscopy_detector,
+            sample_stage=sample_stage,
+            pandabrick=pandabrick,
+            spectroscopy_diodes=spectroscopy_diodes,
+            amplifier_range=EnzLocumRange.RANGE_10NA,
+            fly=False,
+        )
+    )
+
+    assert (
+        await spectroscopy_diodes.amplifier.range.get_value()
+        == EnzLocumRange.RANGE_10NA
+    )
+    assert "spectroscopy_diodes-red" in docs["event"][0]["data"]
+    configuration = docs["descriptor"][0]["configuration"]["spectroscopy_diodes"]
+    assert "spectroscopy_diodes-amplifier-range_max" in configuration["data"]

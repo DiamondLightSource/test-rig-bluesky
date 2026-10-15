@@ -9,6 +9,7 @@ from bluesky.protocols import Movable
 from bluesky.utils import MsgGenerator
 from dodal.common import inject
 from dodal.devices.beamlines.b01_1.diodes import RGBDiodes
+from dodal.devices.current_amplifiers import EnzLocumRange
 from dodal.devices.motors import XYZStage
 from dodal.plans import spec_scan
 from ophyd_async.epics.adaravis import AravisDetector
@@ -52,12 +53,14 @@ def spectroscopy(
     spec: Spec[Movable] | None = None,
     exposure_time: float = 0.1,
     fly: bool = True,
-    gain: str | None = None,
+    amplifier_range: EnzLocumRange | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> MsgGenerator[None]:
     """Do a spectroscopy scan, acquiring from the camera and the RGB diodes."""
-    if gain is not None:
-        yield from bps.abs_set(spectroscopy_diodes.gain, gain, wait=True)
+    if amplifier_range is not None:
+        yield from bps.abs_set(
+            spectroscopy_diodes.amplifier.range, amplifier_range, wait=True
+        )
 
     yield from load_settings(
         device=spectroscopy_detector,
