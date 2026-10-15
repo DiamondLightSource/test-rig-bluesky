@@ -6,8 +6,13 @@ from unittest.mock import ANY, AsyncMock, Mock, patch
 import dodal.beamlines.b01_1 as b01_1
 import pytest
 from bluesky import RunEngine
+from dodal.devices.beamlines.b01_1.diodes import RGBDiodes
+from dodal.devices.current_amplifiers import EnzLocumRange
 from dodal.devices.motors import XYZStage
-from ophyd_async.core import callback_on_mock_put, set_mock_value
+from ophyd_async.core import (
+    callback_on_mock_put,
+    set_mock_value,
+)
 from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.epics.adcore import NDFileHDF5IO
 from ophyd_async.fastcs.panda import HDFPanda
@@ -48,6 +53,11 @@ def sample_stage(run_engine: RunEngine) -> XYZStage:
 @pytest.fixture
 def pandabrick(run_engine: RunEngine) -> HDFPanda:
     return b01_1.pandabrick.build(connect_immediately=True, mock=True)
+
+
+@pytest.fixture
+def spectroscopy_diodes(run_engine: RunEngine) -> RGBDiodes:
+    return b01_1.spectroscopy_diodes.build(connect_immediately=True, mock=True)
 
 
 def _mock_detector_behavior(detector: AravisDetector) -> None:
@@ -141,6 +151,7 @@ async def test_spectroscopy(
     spectroscopy_detector: AravisDetector,
     sample_stage: XYZStage,
     pandabrick: HDFPanda,
+    spectroscopy_diodes: RGBDiodes,
 ):
     docs = defaultdict(list)
     run_engine.subscribe(lambda name, doc: docs[name].append(doc))
@@ -150,6 +161,7 @@ async def test_spectroscopy(
             spectroscopy_detector=spectroscopy_detector,
             sample_stage=sample_stage,
             pandabrick=pandabrick,
+            spectroscopy_diodes=spectroscopy_diodes,
             spec=Line(sample_stage.y, 4.2, 6, 3) * Line(sample_stage.x, 0, 5, 10),
             exposure_time=0.2,
             fly=False,
@@ -174,6 +186,7 @@ async def test_spectroscopy_defaults(
     spectroscopy_detector: AravisDetector,
     sample_stage: XYZStage,
     pandabrick: HDFPanda,
+    spectroscopy_diodes: RGBDiodes,
 ):
     docs = defaultdict(list)
     run_engine.subscribe(lambda name, doc: docs[name].append(doc))
@@ -183,6 +196,7 @@ async def test_spectroscopy_defaults(
             spectroscopy_detector=spectroscopy_detector,
             sample_stage=sample_stage,
             pandabrick=pandabrick,
+            spectroscopy_diodes=spectroscopy_diodes,
             fly=False,
         )
     )
@@ -205,6 +219,7 @@ def test_spectroscopy_datasets(
     spectroscopy_detector: AravisDetector,
     sample_stage: XYZStage,
     pandabrick: HDFPanda,
+    spectroscopy_diodes: RGBDiodes,
 ):
     docs = defaultdict(list)
     run_engine.subscribe(lambda name, doc: docs[name].append(doc))
@@ -214,6 +229,7 @@ def test_spectroscopy_datasets(
             spectroscopy_detector=spectroscopy_detector,
             sample_stage=sample_stage,
             pandabrick=pandabrick,
+            spectroscopy_diodes=spectroscopy_diodes,
             fly=False,
         )
     )
@@ -224,6 +240,9 @@ def test_spectroscopy_datasets(
         "sample_stage-x": 0.0,
         "sample_stage-y": 0.0,
         "sample_stage-z": 0.0,
+        "spectroscopy_diodes-red": 0,
+        "spectroscopy_diodes-green": 0,
+        "spectroscopy_diodes-blue": 0,
     }
 
 
@@ -232,12 +251,14 @@ async def test_spectroscopy_sets_exposure_time_and_acquire_period(
     spectroscopy_detector: AravisDetector,
     sample_stage: XYZStage,
     pandabrick: HDFPanda,
+    spectroscopy_diodes: RGBDiodes,
 ):
     run_engine(
         spectroscopy(
             spectroscopy_detector=spectroscopy_detector,
             sample_stage=sample_stage,
             pandabrick=pandabrick,
+            spectroscopy_diodes=spectroscopy_diodes,
             exposure_time=1.0,
             fly=False,
         )
@@ -285,3 +306,51 @@ def test_serialize_spec_names_device_axes(sample_stage: XYZStage):
         sample_stage.y.name,
         sample_stage.x.name,
     ]
+
+
+async def test_spectroscopy_sets_amplifier_range(
+    run_engine: RunEngine,
+    spectroscopy_detector: AravisDetector,
+    sample_stage: XYZStage,
+    pandabrick: HDFPanda,
+    spectroscopy_diodes: RGBDiodes,
+):
+    docs = defaultdict(list)
+    run_engine.subscribe(lambda name, doc: docs[name].append(doc))
+
+    run_engine(
+        spectroscopy(
+            spectroscopy_detector=spectroscopy_detector,
+            sample_stage=sample_stage,
+            pandabrick=pandabrick,
+            spectroscopy_diodes=spectroscopy_diodes,
+            amplifier_range=EnzLocumRange.RANGE_10NA,
+            fly=False,
+        )
+    )
+
+    assert (
+        await spectroscopy_diodes.amplifier.range.get_value()
+        == EnzLocumRange.RANGE_10NA
+    )
+    configuration = docs["descriptor"][0]["configuration"]["spectroscopy_diodes"]
+    assert "spectroscopy_diodes-amplifier-range_max" in configuration["data"]
+
+
+def test_spectroscopy_rejects_auto_amplifier_range(
+    run_engine: RunEngine,
+    spectroscopy_detector: AravisDetector,
+    sample_stage: XYZStage,
+    spectroscopy_diodes: RGBDiodes,
+):
+    set_mock_value(spectroscopy_diodes.amplifier.range, EnzLocumRange.AUTO)
+
+    with pytest.raises(ValueError, match="Auto"):
+        run_engine(
+            spectroscopy(
+                spectroscopy_detector=spectroscopy_detector,
+                sample_stage=sample_stage,
+                spectroscopy_diodes=spectroscopy_diodes,
+                fly=False,
+            )
+        )
