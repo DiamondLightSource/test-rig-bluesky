@@ -23,7 +23,14 @@ from ophyd_async.epics.pmac import PmacIO
 from ophyd_async.fastcs.panda import HDFPanda
 from scanspec.specs import Line, Spec
 
-from .plans import fly_scan, load_settings, pandabrick, pmac, serialize_spec
+from .plans import (
+    fly_scan,
+    load_panda_settings,
+    load_settings,
+    pandabrick,
+    pmac,
+    serialize_spec,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -57,6 +64,14 @@ def spectroscopy(
     metadata: dict[str, Any] | None = None,
 ) -> MsgGenerator[None]:
     """Do a spectroscopy scan, acquiring from the camera and the RGB diodes."""
+    # The range is only recorded once per scan, as configuration, so it must not
+    # change between points
+    scan_range = amplifier_range or (
+        yield from bps.rd(spectroscopy_diodes.amplifier.range)
+    )
+    if scan_range == EnzLocumRange.AUTO:
+        raise ValueError("The diode amplifier must be on a fixed range, not Auto")
+
     if amplifier_range is not None:
         yield from bps.abs_set(
             spectroscopy_diodes.amplifier.range, amplifier_range, wait=True
@@ -146,6 +161,9 @@ def spectroscopy(
 
     if fly:
         LOGGER.info("Performing a fly scan.")
+        # Captures the diodes' per-frame means under the same names as the step
+        # scan's readings
+        yield from load_panda_settings(panda=pandabox, design_name="pandabox_baseline")
         yield from fly_scan(
             spec,
             spectroscopy_detector,
