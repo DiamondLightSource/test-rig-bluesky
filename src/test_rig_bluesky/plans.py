@@ -1,5 +1,6 @@
 import logging
 import math
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,14 @@ from pydantic import TypeAdapter
 from scanspec.specs import Fly, Spec
 
 LOGGER = logging.getLogger(__name__)
+
+
+class ScanType(StrEnum):
+    """The type of scan to perform."""
+
+    FLY = "fly"
+    STEP = "step"
+
 
 pmac = inject("pmac")
 pandabrick = inject("pandabrick")

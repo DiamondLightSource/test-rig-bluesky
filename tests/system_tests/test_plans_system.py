@@ -4,6 +4,7 @@ from blueapi.service.model import TaskRequest
 from bluesky import RunEngine
 from scanspec.specs import Line
 
+from test_rig_bluesky.plans import ScanType
 from test_rig_bluesky.spectroscopy_plans import spectroscopy
 from test_rig_bluesky.testing import BlueskyPlanRunner
 
@@ -136,5 +137,56 @@ def test_spectroscopy_re():
             spectroscopy_detector=spectroscopy_detector,
             sample_stage=sample_stage,
             spec=scan_spec,
+        )
+    )
+
+
+def test_spectroscopy_step_scan(
+    bluesky_plan_runner,
+    latest_commissioning_instrument_session,
+):
+    events = bluesky_plan_runner.run(
+        TaskRequest(
+            name="spectroscopy",
+            params={"scan_type": ScanType.STEP.value},
+            instrument_session=latest_commissioning_instrument_session,
+        ),
+        timeout=20,
+    )
+
+    assert events["FINISHED"][0]["scanDimensions"] == [5]
+
+
+def test_spectroscopy_fly_scan(
+    bluesky_plan_runner,
+    latest_commissioning_instrument_session,
+):
+    events = bluesky_plan_runner.run(
+        TaskRequest(
+            name="spectroscopy",
+            params={"scan_type": ScanType.FLY.value},
+            instrument_session=latest_commissioning_instrument_session,
+        ),
+        timeout=60,
+    )
+
+    assert events["FINISHED"][0]["scanDimensions"] == [5, 5]
+
+
+@pytest.mark.control_system
+def test_spectroscopy_re_run_engine():
+    run_engine = RunEngine()
+
+    spectroscopy_detector = b01_1.spectroscopy_detector.build(connect_immediately=True)
+    sample_stage = b01_1.sample_stage.build(connect_immediately=True)
+
+    scan_spec = Line(sample_stage.y, 0, 5, 50) * Line(sample_stage.x, 2, 5, 30)
+
+    run_engine(
+        spectroscopy(
+            spectroscopy_detector=spectroscopy_detector,
+            sample_stage=sample_stage,
+            spec=scan_spec,
+            scan_type=ScanType.STEP,
         )
     )
