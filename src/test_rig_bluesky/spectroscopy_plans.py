@@ -21,7 +21,7 @@ from ophyd_async.epics.pmac import PmacIO
 from ophyd_async.fastcs.panda import HDFPanda
 from scanspec.specs import Line, Spec
 
-from .plans import fly_scan, load_settings, pandabrick, pmac, serialize_spec
+from .plans import ScanType, fly_scan, load_settings, pandabrick, pmac, serialize_spec
 
 LOGGER = logging.getLogger(__name__)
 
@@ -46,10 +46,53 @@ def spectroscopy(
     pandabrick: HDFPanda = pandabrick,
     spec: Spec[Movable] | None = None,
     exposure_time: float = 0.1,
-    fly: bool = True,
+    total_number_of_scan_points: int = 25,
+    grid_size: float = 5.0,
+    grid_origin_x: float = 0.0,
+    grid_origin_y: float = 0.0,
     metadata: dict[str, Any] | None = None,
+    *,
+    scan_type: ScanType,
 ) -> MsgGenerator[None]:
     """Do a spectroscopy scan."""
+
+    if scan_type == ScanType.FLY:
+        xsteps = int(round(math.sqrt(total_number_of_scan_points)))
+        velocity = grid_size / (xsteps * exposure_time)
+
+        if velocity > MAX_STAGE_VELOCITY:
+            raise ValueError(
+                f"Requested fly scan requires {velocity:.2f} mm/s, "
+                f"exceeding the maximum stage velocity of "
+                f"{MAX_STAGE_VELOCITY:.2f} mm/s."
+            )
+
+        LOGGER.info(
+            "Performing a fly scan. Estimated velocity: %.2f mm/s.",
+            velocity,
+        )
+    else:
+        LOGGER.info("Performing a step scan.")
+
+    if spec is None:
+        xsteps = ysteps = int(round(math.sqrt(max(total_number_of_scan_points, 1))))
+        xmin = grid_origin_x
+        xmax = grid_origin_x + grid_size
+        ymin = grid_origin_y
+        ymax = grid_origin_y + grid_size
+
+        # Move to the start point
+        yield from bps.mv(
+            *(sample_stage.x, xmin), *(sample_stage.y, ymin), group="initial_move"
+        )
+
+        spec = Line(sample_stage.y, ymin, ymax, ysteps) * ~Line(
+            sample_stage.x,
+            xmin,
+            xmax,
+            xsteps,
+        )
+
     yield from load_settings(
         device=spectroscopy_detector,
         design_name="spectroscopy_detector_baseline",
@@ -125,15 +168,12 @@ def spectroscopy(
         ],
     )
 
-    spec = spec or Line(sample_stage.x, 0, 5, 5)  # type: ignore
-
     # write json-serializable form of spec into metadata
     if metadata is None:
         metadata = {}
     metadata["spec"] = serialize_spec(spec)
 
-    if fly:
-        LOGGER.info("Performing a fly scan.")
+    if scan_type == ScanType.FLY:
         yield from fly_scan(
             spec,
             spectroscopy_detector,
@@ -145,68 +185,8 @@ def spectroscopy(
             metadata=metadata,
         )
     else:
-        LOGGER.info("Performing a step scan.")
         yield from spec_scan(
             {spectroscopy_detector, sample_stage},
             spec,  # type: ignore
             metadata=metadata,
         )
-
-
-def demo_spectroscopy(
-    spectroscopy_detector: AravisDetector = spectroscopy_detector,
-    sample_stage: XYZStage = sample_stage,
-    pmac: PmacIO = pmac,
-    pandabrick: HDFPanda = pandabrick,
-    total_number_of_scan_points: int = 25,
-    grid_size: float = 5.0,
-    grid_origin_x: float = 0.0,
-    grid_origin_y: float = 0.0,
-    exposure_time: float = 0.1,
-    metadata: dict[str, Any] | None = None,
-) -> MsgGenerator[None]:
-    """Spectroscopy plan intended for use in Visr demonstrations to visitors.
-    The time taken to scan is approximately linear in total_numbers_of_grid_points.
-    All other parameters can be left at their defaults.
-    """
-    xsteps = ysteps = int(round(math.sqrt(max(total_number_of_scan_points, 1))))
-    xmin = grid_origin_x
-    xmax = grid_origin_x + grid_size
-    ymin = grid_origin_y
-    ymax = grid_origin_y + grid_size
-
-    velomax = grid_size / (xsteps * exposure_time)
-    if velomax <= MAX_STAGE_VELOCITY * 0.98:
-        fly = True
-        LOGGER.info("test-rig-bluesky")
-        LOGGER.info(
-            f"Estimated velocity is {velomax:.2f} mm/sec, performing a fly scan."
-        )
-    else:
-        fly = False
-        LOGGER.info(
-            f"Estimated velocity is {velomax:.2f} mm/sec, performing a step scan."
-        )
-
-    # Move to the start point
-    # pmac should handle premove
-    yield from bps.mv(
-        *(sample_stage.x, xmin), *(sample_stage.y, ymin), group="initial_move"
-    )
-
-    grid = Line(sample_stage.y, ymin, ymax, ysteps) * ~Line(  # type: ignore
-        sample_stage.x,  # type: ignore
-        xmin,
-        xmax,
-        xsteps,
-    )
-    yield from spectroscopy(
-        spectroscopy_detector=spectroscopy_detector,
-        sample_stage=sample_stage,
-        pmac=pmac,
-        pandabrick=pandabrick,
-        spec=grid,
-        exposure_time=exposure_time,
-        fly=fly,
-        metadata=metadata,
-    )
