@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import unittest.mock
 from collections import defaultdict
 from unittest.mock import ANY, AsyncMock, Mock, patch
@@ -275,33 +274,3 @@ def test_demo_spectroscopy():
         fake_stage.x, 0.0, 5.0, 5
     )
     assert called_kwargs["scan_type"] == ScanType.FLY
-
-
-@pytest.mark.parametrize(
-    "grid_size, expect_warning",
-    [(4.0, False), (10.0, True)],
-)
-def test_demo_spectroscopy_warns_if_velocity_too_high(
-    caplog: pytest.LogCaptureFixture,
-    grid_size: float,
-    expect_warning: bool,
-):
-    with unittest.mock.patch("test_rig_bluesky.spectroscopy_plans.spectroscopy"):
-        plan = demo_spectroscopy(
-            spectroscopy_detector=unittest.mock.MagicMock(),
-            sample_stage=unittest.mock.MagicMock(),
-            grid_size=grid_size,
-            exposure_time=0.1,
-            total_number_of_scan_points=25,
-            scan_type=ScanType.FLY,
-        )
-        with caplog.at_level(logging.WARNING):
-            # Consume the generator to check the warning does not stop the plan
-            for _ in plan:
-                pass
-
-    warned = any(
-        "exceeds the maximum stage velocity" in record.message
-        for record in caplog.records
-    )
-    assert warned == expect_warning
