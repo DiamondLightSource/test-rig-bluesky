@@ -19,7 +19,7 @@ from ophyd_async.fastcs.panda import HDFPanda
 from pydantic import Field
 from scanspec.specs import Line, Spec
 
-from .plans import fly_scan, load_settings, pandabrick, pmac, serialize_spec
+from .plans import ScanType, fly_scan, load_settings, pandabrick, pmac, serialize_spec
 
 LOGGER = logging.getLogger(__name__)
 
@@ -143,9 +143,10 @@ def tomography(
     angular_range: float = 360.0,
     start_angle: float = 0.0,
     exposure_time: float = 0.1,
-    fly: bool = True,
     spec: Spec[Movable] | None = None,
     metadata: dict[str, Any] | None = None,
+    *,
+    scan_type: ScanType,
 ) -> MsgGenerator[None]:
     """Do a tomography scan."""
     yield from _setup_detector(tomography_detector, exposure_time)
@@ -169,7 +170,7 @@ def tomography(
     metadata[LIGHT_SOURCE_KEY] = light_source.value
 
     def scan() -> MsgGenerator[None]:
-        if fly:
+        if scan_type == ScanType.FLY:
             LOGGER.info("Performing a tomography fly scan.")
             yield from fly_scan(
                 spec,
@@ -183,7 +184,7 @@ def tomography(
                 plan_name="tomography_fly_scan",
                 metadata=metadata,
             )
-        else:
+        elif scan_type == ScanType.STEP:
             LOGGER.info("Performing a tomography step scan.")
             yield from spec_scan(
                 {tomography_detector, tomography_stage},
