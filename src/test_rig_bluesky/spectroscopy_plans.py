@@ -183,14 +183,11 @@ def demo_spectroscopy(
         velocity = grid_size / (xsteps * exposure_time)
         LOGGER.info("Estimated fly scan velocity is %.2f mm/s.", velocity)
 
-        # Only warn, as ophyd-async will reject the scan if the stage really
-        # cannot go that fast.
         if velocity > MAX_STAGE_VELOCITY:
-            LOGGER.warning(
-                "Estimated fly scan velocity of %.2f mm/s exceeds the maximum "
-                "stage velocity of %.2f mm/s.",
-                velocity,
-                MAX_STAGE_VELOCITY,
+            raise ValueError(
+                f"Requested fly scan requires {velocity:.2f} mm/s, "
+                f"exceeding the maximum stage velocity of "
+                f"{MAX_STAGE_VELOCITY:.2f} mm/s."
             )
 
     # Move to the start point
