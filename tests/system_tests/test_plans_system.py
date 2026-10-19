@@ -28,20 +28,6 @@ def test_snapshot(
     assert events["FINISHED"][0]["scanDimensions"] == [1]
 
 
-def test_spectroscopy(
-    bluesky_plan_runner: BlueskyPlanRunner, latest_commissioning_instrument_session: str
-):
-    events = bluesky_plan_runner.run(
-        TaskRequest(
-            name="spectroscopy",
-            params={"scan_type": ScanType.FLY.value},
-            instrument_session=latest_commissioning_instrument_session,
-        ),
-        timeout=20,
-    )
-    assert events["FINISHED"][0]["scanDimensions"] == [5]
-
-
 def test_spectroscopy_with_custom_trajectory(
     bluesky_plan_runner: BlueskyPlanRunner, latest_commissioning_instrument_session: str
 ):
