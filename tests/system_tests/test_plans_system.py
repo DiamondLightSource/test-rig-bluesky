@@ -34,6 +34,7 @@ def test_spectroscopy(
     events = bluesky_plan_runner.run(
         TaskRequest(
             name="spectroscopy",
+            params={"scan_type": ScanType.FLY.value},
             instrument_session=latest_commissioning_instrument_session,
         ),
         timeout=20,
@@ -50,7 +51,7 @@ def test_spectroscopy_with_custom_trajectory(
     events = bluesky_plan_runner.run(
         TaskRequest(
             name="spectroscopy",
-            params={"spec": scan_spec.serialize()},
+            params={"spec": scan_spec.serialize(), "scan_type": ScanType.FLY.value},
             instrument_session=latest_commissioning_instrument_session,
         ),
         timeout=60,
@@ -64,6 +65,7 @@ def test_demo_spectroscopy(
     events = bluesky_plan_runner.run(
         TaskRequest(
             name="demo_spectroscopy",
+            params={"scan_type": ScanType.STEP.value},
             instrument_session=latest_commissioning_instrument_session,
         ),
         timeout=1000,
@@ -78,6 +80,7 @@ def test_demo_spectroscopy_with_custom_trajectory(
         TaskRequest(
             name="demo_spectroscopy",
             params={
+                "scan_type": ScanType.STEP.value,
                 "exposure_time": 0.05,
                 "grid_size": 2.5,
                 "grid_origin_y": 0.5,
@@ -137,6 +140,7 @@ def test_spectroscopy_re():
             spectroscopy_detector=spectroscopy_detector,
             sample_stage=sample_stage,
             spec=scan_spec,
+            scan_type=ScanType.FLY,
         )
     )
 
@@ -170,7 +174,7 @@ def test_spectroscopy_fly_scan(
         timeout=60,
     )
 
-    assert events["FINISHED"][0]["scanDimensions"] == [5, 5]
+    assert events["FINISHED"][0]["scanDimensions"] == [5]
 
 
 @pytest.mark.control_system

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import unittest.mock
 from collections import defaultdict
 from unittest.mock import ANY, AsyncMock, Mock, patch
@@ -15,6 +16,7 @@ from ophyd_async.testing import assert_emitted
 from scanspec.specs import Line
 
 from test_rig_bluesky.plans import (
+    ScanType,
     load_settings,
     save_settings,
     snapshot,
@@ -151,7 +153,7 @@ async def test_spectroscopy(
             pandabrick=pandabrick,
             spec=Line(sample_stage.y, 4.2, 6, 3) * Line(sample_stage.x, 0, 5, 10),
             exposure_time=0.2,
-            fly=False,
+            scan_type=ScanType.STEP,
         )
     )
 
@@ -182,7 +184,7 @@ async def test_spectroscopy_defaults(
             spectroscopy_detector=spectroscopy_detector,
             sample_stage=sample_stage,
             pandabrick=pandabrick,
-            fly=False,
+            scan_type=ScanType.STEP,
         )
     )
 
@@ -213,7 +215,7 @@ def test_spectroscopy_datasets(
             spectroscopy_detector=spectroscopy_detector,
             sample_stage=sample_stage,
             pandabrick=pandabrick,
-            fly=False,
+            scan_type=ScanType.STEP,
         )
     )
 
@@ -238,7 +240,7 @@ async def test_spectroscopy_sets_exposure_time_and_acquire_period(
             sample_stage=sample_stage,
             pandabrick=pandabrick,
             exposure_time=1.0,
-            fly=False,
+            scan_type=ScanType.STEP,
         )
     )
     assert await spectroscopy_detector.driver.acquire_time.get_value() == 1.0
@@ -258,6 +260,7 @@ def test_demo_spectroscopy():
             spectroscopy_detector=fake_detector,
             sample_stage=fake_stage,
             total_number_of_scan_points=25,
+            scan_type=ScanType.FLY,
         )
 
         # Consume the generator so that the spectroscopy call is made
@@ -271,3 +274,34 @@ def test_demo_spectroscopy():
     assert called_kwargs["spec"] == Line(fake_stage.y, 0.0, 5.0, 5) * ~Line(
         fake_stage.x, 0.0, 5.0, 5
     )
+    assert called_kwargs["scan_type"] == ScanType.FLY
+
+
+@pytest.mark.parametrize(
+    "grid_size, expect_warning",
+    [(4.0, False), (10.0, True)],
+)
+def test_demo_spectroscopy_warns_if_velocity_too_high(
+    caplog: pytest.LogCaptureFixture,
+    grid_size: float,
+    expect_warning: bool,
+):
+    with unittest.mock.patch("test_rig_bluesky.spectroscopy_plans.spectroscopy"):
+        plan = demo_spectroscopy(
+            spectroscopy_detector=unittest.mock.MagicMock(),
+            sample_stage=unittest.mock.MagicMock(),
+            grid_size=grid_size,
+            exposure_time=0.1,
+            total_number_of_scan_points=25,
+            scan_type=ScanType.FLY,
+        )
+        with caplog.at_level(logging.WARNING):
+            # Consume the generator to check the warning does not stop the plan
+            for _ in plan:
+                pass
+
+    warned = any(
+        "exceeds the maximum stage velocity" in record.message
+        for record in caplog.records
+    )
+    assert warned == expect_warning
