@@ -60,18 +60,22 @@ def spectroscopy(
         xsteps = int(round(math.sqrt(total_number_of_scan_points)))
         velocity = grid_size / (xsteps * exposure_time)
 
+        # This estimate assumes the default square grid, so only warn: a spec
+        # passed in directly may move at a different speed, and ophyd-async
+        # will reject the scan if the stage really cannot go that fast.
         if velocity > MAX_STAGE_VELOCITY:
-            raise ValueError(
-                f"Requested fly scan requires {velocity:.2f} mm/s, "
-                f"exceeding the maximum stage velocity of "
-                f"{MAX_STAGE_VELOCITY:.2f} mm/s."
+            LOGGER.warning(
+                "Estimated velocity for a square grid fly scan is %.2f mm/s, "
+                "exceeding the maximum stage velocity of %.2f mm/s.",
+                velocity,
+                MAX_STAGE_VELOCITY,
             )
 
         LOGGER.info(
-            "Performing a fly scan. Estimated velocity: %.2f mm/s.",
+            "Performing a fly scan. Estimated velocity for a square grid: %.2f mm/s.",
             velocity,
         )
-    else:
+    elif scan_type == ScanType.STEP:
         LOGGER.info("Performing a step scan.")
 
     if spec is None:
