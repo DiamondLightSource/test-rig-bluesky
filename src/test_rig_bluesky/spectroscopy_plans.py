@@ -46,56 +46,11 @@ def spectroscopy(
     pandabrick: HDFPanda = pandabrick,
     spec: Spec[Movable] | None = None,
     exposure_time: float = 0.1,
-    total_number_of_scan_points: int = 25,
-    grid_size: float = 5.0,
-    grid_origin_x: float = 0.0,
-    grid_origin_y: float = 0.0,
     metadata: dict[str, Any] | None = None,
     *,
     scan_type: ScanType,
 ) -> MsgGenerator[None]:
     """Do a spectroscopy scan."""
-
-    if scan_type == ScanType.FLY:
-        xsteps = int(round(math.sqrt(total_number_of_scan_points)))
-        velocity = grid_size / (xsteps * exposure_time)
-
-        # This estimate assumes the default square grid, so only warn: a spec
-        # passed in directly may move at a different speed, and ophyd-async
-        # will reject the scan if the stage really cannot go that fast.
-        if velocity > MAX_STAGE_VELOCITY:
-            LOGGER.warning(
-                "Estimated velocity for a square grid fly scan is %.2f mm/s, "
-                "exceeding the maximum stage velocity of %.2f mm/s.",
-                velocity,
-                MAX_STAGE_VELOCITY,
-            )
-
-        LOGGER.info(
-            "Performing a fly scan. Estimated velocity for a square grid: %.2f mm/s.",
-            velocity,
-        )
-    elif scan_type == ScanType.STEP:
-        LOGGER.info("Performing a step scan.")
-
-    if spec is None:
-        xsteps = ysteps = int(round(math.sqrt(max(total_number_of_scan_points, 1))))
-        xmin = grid_origin_x
-        xmax = grid_origin_x + grid_size
-        ymin = grid_origin_y
-        ymax = grid_origin_y + grid_size
-
-        # Move to the start point
-        yield from bps.mv(
-            *(sample_stage.x, xmin), *(sample_stage.y, ymin), group="initial_move"
-        )
-
-        spec = Line(sample_stage.y, ymin, ymax, ysteps) * ~Line(
-            sample_stage.x,
-            xmin,
-            xmax,
-            xsteps,
-        )
 
     yield from load_settings(
         device=spectroscopy_detector,
@@ -172,12 +127,15 @@ def spectroscopy(
         ],
     )
 
+    spec = spec or Line(sample_stage.x, 0, 5, 5)  # type: ignore
+
     # write json-serializable form of spec into metadata
     if metadata is None:
         metadata = {}
     metadata["spec"] = serialize_spec(spec)
 
     if scan_type == ScanType.FLY:
+        LOGGER.info("Performing a fly scan.")
         yield from fly_scan(
             spec,
             spectroscopy_detector,
@@ -188,9 +146,72 @@ def spectroscopy(
             panda_whitelist=PANDA_WHITELIST,
             metadata=metadata,
         )
-    else:
+    elif scan_type == ScanType.STEP:
+        LOGGER.info("Performing a step scan.")
         yield from spec_scan(
             {spectroscopy_detector, sample_stage},
             spec,  # type: ignore
             metadata=metadata,
         )
+
+
+def demo_spectroscopy(
+    spectroscopy_detector: AravisDetector = spectroscopy_detector,
+    sample_stage: XYZStage = sample_stage,
+    pmac: PmacIO = pmac,
+    pandabrick: HDFPanda = pandabrick,
+    total_number_of_scan_points: int = 25,
+    grid_size: float = 5.0,
+    grid_origin_x: float = 0.0,
+    grid_origin_y: float = 0.0,
+    exposure_time: float = 0.1,
+    metadata: dict[str, Any] | None = None,
+    *,
+    scan_type: ScanType,
+) -> MsgGenerator[None]:
+    """Spectroscopy plan intended for use in Visr demonstrations to visitors.
+    Scans a square grid. The time taken to scan is approximately linear in
+    total_number_of_scan_points. All other parameters can be left at their defaults.
+    """
+    xsteps = ysteps = int(round(math.sqrt(max(total_number_of_scan_points, 1))))
+    xmin = grid_origin_x
+    xmax = grid_origin_x + grid_size
+    ymin = grid_origin_y
+    ymax = grid_origin_y + grid_size
+
+    if scan_type == ScanType.FLY:
+        velocity = grid_size / (xsteps * exposure_time)
+        LOGGER.info("Estimated fly scan velocity is %.2f mm/s.", velocity)
+
+        # Only warn, as ophyd-async will reject the scan if the stage really
+        # cannot go that fast.
+        if velocity > MAX_STAGE_VELOCITY:
+            LOGGER.warning(
+                "Estimated fly scan velocity of %.2f mm/s exceeds the maximum "
+                "stage velocity of %.2f mm/s.",
+                velocity,
+                MAX_STAGE_VELOCITY,
+            )
+
+    # Move to the start point
+    # pmac should handle premove
+    yield from bps.mv(
+        *(sample_stage.x, xmin), *(sample_stage.y, ymin), group="initial_move"
+    )
+
+    grid = Line(sample_stage.y, ymin, ymax, ysteps) * ~Line(  # type: ignore
+        sample_stage.x,  # type: ignore
+        xmin,
+        xmax,
+        xsteps,
+    )
+    yield from spectroscopy(
+        spectroscopy_detector=spectroscopy_detector,
+        sample_stage=sample_stage,
+        pmac=pmac,
+        pandabrick=pandabrick,
+        spec=grid,
+        exposure_time=exposure_time,
+        metadata=metadata,
+        scan_type=scan_type,
+    )
