@@ -60,7 +60,6 @@ def spectroscopy(
     spectroscopy_diodes: RGBDiodes = spectroscopy_diodes,
     spec: Spec[Movable] | None = None,
     exposure_time: float = 0.1,
-    fly: bool = True,
     amplifier_range: EnzLocumRange | None = None,
     metadata: dict[str, Any] | None = None,
     *,

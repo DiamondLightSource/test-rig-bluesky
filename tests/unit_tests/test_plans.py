@@ -328,7 +328,7 @@ async def test_spectroscopy_sets_amplifier_range(
             pandabrick=pandabrick,
             spectroscopy_diodes=spectroscopy_diodes,
             amplifier_range=EnzLocumRange.RANGE_10NA,
-            scan_type=ScanType.FLY,
+            scan_type=ScanType.STEP,
         )
     )
 
@@ -354,6 +354,6 @@ def test_spectroscopy_rejects_auto_amplifier_range(
                 spectroscopy_detector=spectroscopy_detector,
                 sample_stage=sample_stage,
                 spectroscopy_diodes=spectroscopy_diodes,
-                scan_type=ScanType.FLY,
+                scan_type=ScanType.STEP,
             )
         )
