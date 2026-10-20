@@ -128,6 +128,12 @@ def fly_scan(
     diodes: Readable | None = None,
 ):
     """Fly scan a triggered detector along a spec."""
+    # The pandabox captures the diode counts, which only mean something alongside
+    # the amplifier range recorded from the diodes, so we need both or neither
+    if pandabox is not None and diodes is None:
+        raise ValueError("pandabox was given without diodes")
+    if diodes is not None and pandabox is None:
+        raise ValueError("diodes were given without pandabox")
 
     detectors = [detector] if pandabox is None else [pandabox, detector]
 
