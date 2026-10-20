@@ -15,6 +15,7 @@ from ophyd_async.testing import assert_emitted
 from scanspec.specs import Line, Spec
 
 from test_rig_bluesky.plans import (
+    ScanType,
     load_settings,
     save_settings,
     serialize_spec,
@@ -152,7 +153,7 @@ async def test_spectroscopy(
             pandabrick=pandabrick,
             spec=Line(sample_stage.y, 4.2, 6, 3) * Line(sample_stage.x, 0, 5, 10),
             exposure_time=0.2,
-            fly=False,
+            scan_type=ScanType.STEP,
         )
     )
 
@@ -183,7 +184,7 @@ async def test_spectroscopy_defaults(
             spectroscopy_detector=spectroscopy_detector,
             sample_stage=sample_stage,
             pandabrick=pandabrick,
-            fly=False,
+            scan_type=ScanType.STEP,
         )
     )
 
@@ -214,7 +215,7 @@ def test_spectroscopy_datasets(
             spectroscopy_detector=spectroscopy_detector,
             sample_stage=sample_stage,
             pandabrick=pandabrick,
-            fly=False,
+            scan_type=ScanType.STEP,
         )
     )
 
@@ -239,7 +240,7 @@ async def test_spectroscopy_sets_exposure_time_and_acquire_period(
             sample_stage=sample_stage,
             pandabrick=pandabrick,
             exposure_time=1.0,
-            fly=False,
+            scan_type=ScanType.STEP,
         )
     )
     assert await spectroscopy_detector.driver.acquire_time.get_value() == 1.0
@@ -259,6 +260,7 @@ def test_demo_spectroscopy():
             spectroscopy_detector=fake_detector,
             sample_stage=fake_stage,
             total_number_of_scan_points=25,
+            scan_type=ScanType.FLY,
         )
 
         # Consume the generator so that the spectroscopy call is made
@@ -272,6 +274,7 @@ def test_demo_spectroscopy():
     assert called_kwargs["spec"] == Line(fake_stage.y, 0.0, 5.0, 5) * ~Line(
         fake_stage.x, 0.0, 5.0, 5
     )
+    assert called_kwargs["scan_type"] == ScanType.FLY
 
 
 def test_serialize_spec_names_device_axes(sample_stage: XYZStage):
