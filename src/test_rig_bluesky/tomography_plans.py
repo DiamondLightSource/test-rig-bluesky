@@ -19,7 +19,7 @@ from ophyd_async.fastcs.panda import HDFPanda
 from pydantic import Field
 from scanspec.specs import Line, Spec
 
-from .plans import fly_scan, load_settings, pandabrick, pmac, serialize_spec
+from .plans import ScanType, fly_scan, load_settings, pandabrick, pmac, serialize_spec
 
 LOGGER = logging.getLogger(__name__)
 
@@ -139,13 +139,11 @@ def tomography(
     tomography_stage: Motor = tomography_stage,
     pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
-    number_of_projections: NumProjections = 360,
-    angular_range: float = 360.0,
-    start_angle: float = 0.0,
     exposure_time: float = 0.1,
-    fly: bool = True,
     spec: Spec[Movable] | None = None,
     metadata: dict[str, Any] | None = None,
+    *,
+    scan_type: ScanType,
 ) -> MsgGenerator[None]:
     """Do a tomography scan."""
     yield from _setup_detector(tomography_detector, exposure_time)
@@ -156,11 +154,8 @@ def tomography(
         whitelist_pvs=TOMOGRAPHY_STAGE_WHITELIST,
     )
 
-    caller_supplied_spec = spec is not None
-    if spec is None:
-        angular_step = angular_range / number_of_projections
-        last_angle = start_angle + angular_range - angular_step
-        spec = Line(tomography_stage, start_angle, last_angle, number_of_projections)  # type: ignore
+    # One projection per degree over a full rotation
+    spec = spec or Line(tomography_stage, 0, 359, 360)  # type: ignore
 
     if metadata is None:
         metadata = {}
@@ -168,34 +163,50 @@ def tomography(
     # Tells the workflow which calibration images belong with these projections.
     metadata[LIGHT_SOURCE_KEY] = light_source.value
 
-    def scan() -> MsgGenerator[None]:
-        if fly:
-            LOGGER.info("Performing a tomography fly scan.")
-            yield from fly_scan(
-                spec,
-                tomography_detector,
-                pmac=pmac,
-                pandabrick=pandabrick,
-                exposure_time=exposure_time,
-                detector_deadtime=MAKO_DETECTOR_DEADTIME,
-                detector_trigger=TOMOGRAPHY_DETECTOR_TRIGGER,
-                panda_whitelist=PANDA_WHITELIST,
-                plan_name="tomography_fly_scan",
-                metadata=metadata,
-            )
-        else:
-            LOGGER.info("Performing a tomography step scan.")
-            yield from spec_scan(
-                {tomography_detector, tomography_stage},
-                spec,  # type: ignore
-                metadata=metadata,
-            )
+    if scan_type == ScanType.FLY:
+        LOGGER.info("Performing a tomography fly scan.")
+        yield from fly_scan(
+            spec,
+            tomography_detector,
+            pmac=pmac,
+            pandabrick=pandabrick,
+            exposure_time=exposure_time,
+            detector_deadtime=MAKO_DETECTOR_DEADTIME,
+            detector_trigger=TOMOGRAPHY_DETECTOR_TRIGGER,
+            panda_whitelist=PANDA_WHITELIST,
+            plan_name="tomography_fly_scan",
+            metadata=metadata,
+        )
+    elif scan_type == ScanType.STEP:
+        LOGGER.info("Performing a tomography step scan.")
+        yield from spec_scan(
+            {tomography_detector, tomography_stage},
+            spec,  # type: ignore
+            metadata=metadata,
+        )
 
-    if caller_supplied_spec:
-        # The caller owns the geometry, so we do not know where it starts or
-        # what it would mean to unwind to.
-        yield from scan()
-        return
+
+def demo_tomography(
+    light_source: LightSource,
+    tomography_detector: AravisDetector = tomography_detector,
+    tomography_stage: Motor = tomography_stage,
+    pmac: PmacIO = pmac,
+    pandabrick: HDFPanda = pandabrick,
+    number_of_projections: NumProjections = 360,
+    angular_range: float = 360.0,
+    start_angle: float = 0.0,
+    exposure_time: float = 0.1,
+    metadata: dict[str, Any] | None = None,
+    *,
+    scan_type: ScanType,
+) -> MsgGenerator[None]:
+    """Tomography plan intended for use in Visr demonstrations to visitors.
+    Takes number_of_projections evenly spaced over angular_range from start_angle,
+    then winds the stage back to start_angle.
+    """
+    angular_step = angular_range / number_of_projections
+    last_angle = start_angle + angular_range - angular_step
+    spec = Line(tomography_stage, start_angle, last_angle, number_of_projections)  # type: ignore
 
     # PMAC handles the run-up, but move to the nominal start first so a failure
     # here is reported before the trajectory is built.
@@ -208,4 +219,17 @@ def tomography(
         # beginning again and reset the angle to 0?
         yield from bps.mv(tomography_stage, start_angle, group="wind_back")
 
-    yield from bpp.finalize_wrapper(scan(), wind_back)
+    yield from bpp.finalize_wrapper(
+        tomography(
+            light_source,
+            tomography_detector=tomography_detector,
+            tomography_stage=tomography_stage,
+            pmac=pmac,
+            pandabrick=pandabrick,
+            exposure_time=exposure_time,
+            spec=spec,
+            metadata=metadata,
+            scan_type=scan_type,
+        ),
+        wind_back,
+    )
