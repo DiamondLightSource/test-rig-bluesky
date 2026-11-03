@@ -35,10 +35,10 @@ from .plans import (
 
 LOGGER = logging.getLogger(__name__)
 
-spectroscopy_detector = inject("spectroscopy_detector")
-spectroscopy_diodes = inject("spectroscopy_diodes")
+detector = inject("spectroscopy_detector")
+diodes = inject("spectroscopy_diodes")
 pandabox = inject("pandabox")
-sample_stage = inject("spectroscopy_stage")
+stage = inject("spectroscopy_stage")
 
 # The encoder entries map to specific axes, so despite the PandA being shared
 # hardware this list is spectroscopy's.
@@ -62,12 +62,12 @@ MAX_STAGE_VELOCITY = 10.0
 
 
 def spectroscopy(
-    spectroscopy_detector: AravisDetector = spectroscopy_detector,
-    sample_stage: XYZStage = sample_stage,
+    detector: AravisDetector = detector,
+    stage: XYZStage = stage,
     pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
     pandabox: HDFPanda = pandabox,
-    spectroscopy_diodes: RGBDiodes = spectroscopy_diodes,
+    diodes: RGBDiodes = diodes,
     spec: Spec[Movable] | None = None,
     exposure_time: float = 0.1,
     amplifier_range: EnzLocumRange | None = None,
@@ -78,19 +78,15 @@ def spectroscopy(
     """Do a spectroscopy scan, acquiring from the camera and the RGB diodes."""
     # The range is only recorded once per scan, as configuration, so it must not
     # change between points
-    scan_range = amplifier_range or (
-        yield from bps.rd(spectroscopy_diodes.amplifier.range)
-    )
+    scan_range = amplifier_range or (yield from bps.rd(diodes.amplifier.range))
     if scan_range == EnzLocumRange.AUTO:
         raise ValueError("The diode amplifier must be on a fixed range, not Auto")
 
     if amplifier_range is not None:
-        yield from bps.abs_set(
-            spectroscopy_diodes.amplifier.range, amplifier_range, wait=True
-        )
+        yield from bps.abs_set(diodes.amplifier.range, amplifier_range, wait=True)
 
     yield from load_settings(
-        device=spectroscopy_detector,
+        device=detector,
         design_name="spectroscopy_detector_baseline",
         whitelist_pvs=[
             "hdf-nd_array_port",
@@ -126,17 +122,17 @@ def spectroscopy(
     # outside of a run.
     # See: https://github.com/DiamondLightSource/blueapi/issues/1211
     yield from bps.mv(
-        *(spectroscopy_detector.driver.acquire_time, exposure_time),
+        *(detector.driver.acquire_time, exposure_time),
         *(
-            spectroscopy_detector.driver.acquire_period,
+            detector.driver.acquire_period,
             exposure_time + MANTA_ACQUIRE_PERIOD_PAD,
         ),
-        group="spectroscopy_detector_aquire",
+        group="detector_aquire",
     )
 
     params: list[NDAttributeParam] = []
-    for channel in list(spectroscopy_detector.roistat.channels.keys()):  # type: ignore
-        roistatn = spectroscopy_detector.roistat.channels[channel]  # type: ignore
+    for channel in list(detector.roistat.channels.keys()):  # type: ignore
+        roistatn = detector.roistat.channels[channel]  # type: ignore
         assert isinstance(roistatn, NDROIStatNIO)
 
         channel_name = yield from bps.rd(roistatn.name_)
@@ -151,11 +147,11 @@ def spectroscopy(
             )
         )
 
-    yield from setup_ndattributes(spectroscopy_detector.roistat, params)  # type: ignore
+    yield from setup_ndattributes(detector.roistat, params)  # type: ignore
 
     yield from load_settings(
-        device=sample_stage,
-        design_name="sample_stage_baseline",
+        device=stage,
+        design_name="spectroscopy_stage_baseline",
         whitelist_pvs=[
             "x-acceleration_time",
             "x-velocity",
@@ -164,7 +160,7 @@ def spectroscopy(
         ],
     )
 
-    spec = spec or Line(sample_stage.x, 0, 5, 5)  # type: ignore
+    spec = spec or Line(stage.x, 0, 5, 5)  # type: ignore
 
     # write json-serializable form of spec into metadata
     if metadata is None:
@@ -181,7 +177,7 @@ def spectroscopy(
         )
         yield from fly_scan(
             spec,
-            spectroscopy_detector,
+            detector,
             pmac=pmac,
             pandabrick=pandabrick,
             exposure_time=exposure_time,
@@ -189,24 +185,24 @@ def spectroscopy(
             pandabrick_whitelist=PANDA_WHITELIST,
             metadata=metadata,
             pandabox=pandabox,
-            diodes=spectroscopy_diodes,
+            diodes=diodes,
         )
     elif scan_type == ScanType.STEP:
         LOGGER.info("Performing a step scan.")
         yield from spec_scan(
-            {spectroscopy_detector, spectroscopy_diodes, sample_stage},
+            {detector, diodes, stage},
             spec,  # type: ignore
             metadata=metadata,
         )
 
 
 def demo_spectroscopy(
-    spectroscopy_detector: AravisDetector = spectroscopy_detector,
-    sample_stage: XYZStage = sample_stage,
+    detector: AravisDetector = detector,
+    stage: XYZStage = stage,
     pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
     pandabox: HDFPanda = pandabox,
-    spectroscopy_diodes: RGBDiodes = spectroscopy_diodes,
+    diodes: RGBDiodes = diodes,
     total_number_of_scan_points: int = 25,
     grid_size: float = 5.0,
     grid_origin_x: float = 0.0,
@@ -239,23 +235,21 @@ def demo_spectroscopy(
 
     # Move to the start point
     # pmac should handle premove
-    yield from bps.mv(
-        *(sample_stage.x, xmin), *(sample_stage.y, ymin), group="initial_move"
-    )
+    yield from bps.mv(*(stage.x, xmin), *(stage.y, ymin), group="initial_move")
 
-    grid = Line(sample_stage.y, ymin, ymax, ysteps) * ~Line(  # type: ignore
-        sample_stage.x,  # type: ignore
+    grid = Line(stage.y, ymin, ymax, ysteps) * ~Line(  # type: ignore
+        stage.x,  # type: ignore
         xmin,
         xmax,
         xsteps,
     )
     yield from spectroscopy(
-        spectroscopy_detector=spectroscopy_detector,
-        sample_stage=sample_stage,
+        detector=detector,
+        stage=stage,
         pmac=pmac,
         pandabrick=pandabrick,
         pandabox=pandabox,
-        spectroscopy_diodes=spectroscopy_diodes,
+        diodes=diodes,
         spec=grid,
         exposure_time=exposure_time,
         metadata=metadata,

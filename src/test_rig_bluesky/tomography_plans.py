@@ -10,10 +10,10 @@ from bluesky.plans import count
 from bluesky.protocols import Movable
 from bluesky.utils import MsgGenerator
 from dodal.common import inject
+from dodal.devices.motors import XThetaStage
 from dodal.plans import spec_scan
 from ophyd_async.core import DetectorTrigger
 from ophyd_async.epics.adaravis import AravisDetector
-from ophyd_async.epics.motor import Motor
 from ophyd_async.epics.pmac import PmacIO
 from ophyd_async.fastcs.panda import HDFPanda
 from pydantic import Field
@@ -24,8 +24,8 @@ from .plans import ScanType, fly_scan, load_settings, pandabrick, pmac, serializ
 LOGGER = logging.getLogger(__name__)
 
 # pmac and pandabrick come from plans.py
-tomography_detector = inject("tomography_detector")
-tomography_stage = inject("tomography_stage")
+detector = inject("tomography_detector")
+stage = inject("tomography_stage")
 
 
 class LightSource(StrEnum):
@@ -57,7 +57,7 @@ NumProjections = Annotated[
 MAKO_ACQUIRE_PERIOD_PAD = 25e-3
 MAKO_DETECTOR_DEADTIME = 25e-3
 
-TOMOGRAPHY_DETECTOR_TRIGGER = DetectorTrigger.EXTERNAL_EDGE
+DETECTOR_TRIGGER = DetectorTrigger.EXTERNAL_EDGE
 
 DETECTOR_WHITELIST = [
     "hdf-nd_array_port",
@@ -67,7 +67,7 @@ DETECTOR_WHITELIST = [
     "driver-trigger_source",
 ]
 
-TOMOGRAPHY_STAGE_WHITELIST = [
+STAGE_WHITELIST = [
     "acceleration_time",
     "velocity",
 ]
@@ -95,14 +95,14 @@ def _setup_detector(
             detector.driver.acquire_period,
             exposure_time + MAKO_ACQUIRE_PERIOD_PAD,
         ),
-        group="tomography_detector_acquire",
+        group="detector_acquire",
     )
 
 
 # @attach_data_session_metadata_decorator()
 def darks_flats(
     light_source: LightSource,
-    tomography_detector: AravisDetector = tomography_detector,
+    detector: AravisDetector = detector,
     num_images: int = 20,
     exposure_time: float = 0.1,
     metadata: dict[str, Any] | None = None,
@@ -128,15 +128,15 @@ def darks_flats(
             light_source.value,
         )
 
-    yield from _setup_detector(tomography_detector, exposure_time)
+    yield from _setup_detector(detector, exposure_time)
 
-    yield from count([tomography_detector], num=num_images, md=run_metadata)
+    yield from count([detector], num=num_images, md=run_metadata)
 
 
 def tomography(
     light_source: LightSource,
-    tomography_detector: AravisDetector = tomography_detector,
-    tomography_stage: Motor = tomography_stage,
+    detector: AravisDetector = detector,
+    stage: XThetaStage = stage,
     pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
     exposure_time: float = 0.1,
@@ -146,16 +146,16 @@ def tomography(
     scan_type: ScanType,
 ) -> MsgGenerator[None]:
     """Do a tomography scan."""
-    yield from _setup_detector(tomography_detector, exposure_time)
+    yield from _setup_detector(detector, exposure_time)
 
     yield from load_settings(
-        device=tomography_stage,
+        device=stage,
         design_name="tomography_stage_baseline",
-        whitelist_pvs=TOMOGRAPHY_STAGE_WHITELIST,
+        whitelist_pvs=STAGE_WHITELIST,
     )
 
     # One projection per degree over a full rotation
-    spec = spec or Line(tomography_stage, 0, 359, 360)  # type: ignore
+    spec = spec or Line(stage, 0, 359, 360)  # type: ignore
 
     if metadata is None:
         metadata = {}
@@ -167,12 +167,12 @@ def tomography(
         LOGGER.info("Performing a tomography fly scan.")
         yield from fly_scan(
             spec,
-            tomography_detector,
+            detector,
             pmac=pmac,
             pandabrick=pandabrick,
             exposure_time=exposure_time,
             detector_deadtime=MAKO_DETECTOR_DEADTIME,
-            detector_trigger=TOMOGRAPHY_DETECTOR_TRIGGER,
+            detector_trigger=DETECTOR_TRIGGER,
             pandabrick_whitelist=PANDA_WHITELIST,
             plan_name="tomography_fly_scan",
             metadata=metadata,
@@ -180,7 +180,7 @@ def tomography(
     elif scan_type == ScanType.STEP:
         LOGGER.info("Performing a tomography step scan.")
         yield from spec_scan(
-            {tomography_detector, tomography_stage},
+            {detector, stage},
             spec,  # type: ignore
             metadata=metadata,
         )
@@ -188,8 +188,8 @@ def tomography(
 
 def demo_tomography(
     light_source: LightSource,
-    tomography_detector: AravisDetector = tomography_detector,
-    tomography_stage: Motor = tomography_stage,
+    detector: AravisDetector = detector,
+    stage: XThetaStage = stage,
     pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
     number_of_projections: NumProjections = 360,
@@ -206,24 +206,24 @@ def demo_tomography(
     """
     angular_step = angular_range / number_of_projections
     last_angle = start_angle + angular_range - angular_step
-    spec = Line(tomography_stage, start_angle, last_angle, number_of_projections)  # type: ignore
+    spec = Line(stage, start_angle, last_angle, number_of_projections)  # type: ignore
 
     # PMAC handles the run-up, but move to the nominal start first so a failure
     # here is reported before the trajectory is built.
-    yield from bps.mv(tomography_stage, start_angle, group="initial_move")
+    yield from bps.mv(stage, start_angle, group="initial_move")
 
     def wind_back() -> MsgGenerator[None]:
         # unwind to leave the stage where the next scan expects it.
         # currently this winds back the full rotation but should look
         # into changing it so that we just advance one step to the
         # beginning again and reset the angle to 0?
-        yield from bps.mv(tomography_stage, start_angle, group="wind_back")
+        yield from bps.mv(stage, start_angle, group="wind_back")
 
     yield from bpp.finalize_wrapper(
         tomography(
             light_source,
-            tomography_detector=tomography_detector,
-            tomography_stage=tomography_stage,
+            detector=detector,
+            stage=stage,
             pmac=pmac,
             pandabrick=pandabrick,
             exposure_time=exposure_time,
