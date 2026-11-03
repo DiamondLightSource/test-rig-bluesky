@@ -38,7 +38,7 @@ def spectroscopy_detector(run_engine: RunEngine) -> AravisDetector:
 
 @pytest.fixture
 def sample_stage(run_engine: RunEngine) -> XYZStage:
-    stage = b01_1.sample_stage.build(connect_immediately=True, mock=True)
+    stage = b01_1.spectroscopy_stage.build(connect_immediately=True, mock=True)
 
     set_mock_value(stage.x.low_limit_travel, -10.0)
     set_mock_value(stage.x.high_limit_travel, 10.0)
@@ -141,9 +141,9 @@ def test_snapshot(
     )
     assert docs["stream_resource"][0].get("data_key") == "spectroscopy_detector"
     assert docs["event"][0]["data"] == {
-        "sample_stage-x": 0.0,
-        "sample_stage-y": 0.0,
-        "sample_stage-z": 0.0,
+        "spectroscopy_stage-x": 0.0,
+        "spectroscopy_stage-y": 0.0,
+        "spectroscopy_stage-z": 0.0,
     }
 
 
@@ -238,9 +238,9 @@ def test_spectroscopy_datasets(
     data_keys = [resource.get("data_key") for resource in docs["stream_resource"]]
     assert data_keys == ["spectroscopy_detector", "BlueTotal", "GreenTotal", "RedTotal"]
     assert docs["event"][0]["data"] == {
-        "sample_stage-x": 0.0,
-        "sample_stage-y": 0.0,
-        "sample_stage-z": 0.0,
+        "spectroscopy_stage-x": 0.0,
+        "spectroscopy_stage-y": 0.0,
+        "spectroscopy_stage-z": 0.0,
         "spectroscopy_diodes-red": 0,
         "spectroscopy_diodes-green": 0,
         "spectroscopy_diodes-blue": 0,

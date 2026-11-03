@@ -38,7 +38,7 @@ LOGGER = logging.getLogger(__name__)
 spectroscopy_detector = inject("spectroscopy_detector")
 spectroscopy_diodes = inject("spectroscopy_diodes")
 pandabox = inject("pandabox")
-sample_stage = inject("sample_stage")
+sample_stage = inject("spectroscopy_stage")
 
 # The encoder entries map to specific axes, so despite the PandA being shared
 # hardware this list is spectroscopy's.
