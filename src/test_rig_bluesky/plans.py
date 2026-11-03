@@ -133,7 +133,19 @@ def fly_scan(
     panda_whitelist: list[str] | None = None,
     plan_name: str = "fly_scan",
     metadata: dict[str, Any] | None = None,
+    pandabox: HDFPanda | None = None,
+    diodes: Readable | None = None,
 ):
+    """Fly scan a triggered detector along a spec."""
+    # The pandabox captures the diode counts, which only mean something alongside
+    # the amplifier range recorded from the diodes, so we need both or neither
+    if pandabox is not None and diodes is None:
+        raise ValueError("pandabox was given without diodes")
+    if diodes is not None and pandabox is None:
+        raise ValueError("diodes were given without pandabox")
+
+    detectors = [detector] if pandabox is None else [pandabox, detector]
+
     yield from load_panda_settings(
         panda=pandabrick,
         design_name="pandabrick_baseline",
@@ -164,7 +176,7 @@ def fly_scan(
     # Reproduce metadata present in spec_scan
     _md = {
         "plan_args": {
-            "detectors": {det.name for det in [pandabrick, detector]},
+            "detectors": {det.name for det in [pandabrick, *detectors]},
             "spec": repr(fly_spec),
         },
         "plan_name": plan_name,
@@ -192,21 +204,28 @@ def fly_scan(
 
     # @attach_data_session_metadata_decorator()
     @bpp.run_decorator(md=_md)
-    @bpp.stage_decorator([pandabrick, pandabrick_seq_flyer, detector, pmac_flyer])
+    @bpp.stage_decorator([pandabrick, pandabrick_seq_flyer, *detectors, pmac_flyer])
     def inner_plan():
+        if diodes is not None:
+            yield from bps.create(name="diodes")
+            yield from bps.read(diodes)
+            yield from bps.save()
+
         # Prepare pmac with the trajectory
         yield from bps.prepare(pmac_flyer, pmac_scan_info)
         # prepare sequencer table
         yield from bps.prepare(pandabrick_seq_flyer, scan_spec_info)
         # prepare panda and hdf writer once, at start of scan
         yield from bps.prepare(pandabrick, panda_hdf_info)
+        if pandabox is not None:
+            yield from bps.prepare(pandabox, panda_hdf_info)
         # prepare detector and info
         # waiting for this last prepare means all prepare functions will be complete
         yield from bps.prepare(detector, detector_info, wait=True)
 
         # Need to run this after detectors are prepared
         yield from bps.declare_stream(
-            pandabrick, detector, name="primary", collect=True
+            pandabrick, *detectors, name="primary", collect=True
         )
 
         # Start the detectors and hdf writers acquiring.
@@ -215,6 +234,8 @@ def fly_scan(
         # its own with wait=true.
         yield from bps.kickoff(pandabrick)
         yield from bps.kickoff(pandabrick_seq_flyer)
+        if pandabox is not None:
+            yield from bps.kickoff(pandabox)
         yield from bps.kickoff(detector, wait=True)
 
         # Start the trajectory.
@@ -226,11 +247,11 @@ def fly_scan(
                 pmac_flyer,
                 pandabrick_seq_flyer,
                 pandabrick,
-                detector,
+                *detectors,
             ),
             dets=(
                 pandabrick,
-                detector,
+                *detectors,
             ),
             stream_name="primary",
             flush_period=0.5,
