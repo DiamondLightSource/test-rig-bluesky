@@ -44,6 +44,16 @@ sample_stage = inject("spectroscopy_stage")
 # hardware this list is spectroscopy's.
 PANDA_WHITELIST = ["incenc-3-val_dataset", "incenc-2-val_dataset"]
 
+# Only the diode channels, so the rest of the pandabox's setup is left alone
+PANDABOX_WHITELIST = [
+    "fmc_in-val5_capture",
+    "fmc_in-val5_dataset",
+    "fmc_in-val6_capture",
+    "fmc_in-val6_dataset",
+    "fmc_in-val7_capture",
+    "fmc_in-val7_dataset",
+]
+
 MANTA_ACQUIRE_PERIOD_PAD = 1961e-6
 MANTA_DETECTOR_DEADTIME = 2e-3 * 1.01
 
@@ -163,9 +173,12 @@ def spectroscopy(
 
     if scan_type == ScanType.FLY:
         LOGGER.info("Performing a fly scan.")
-        # Captures the diodes' per-frame means under the same names as the step
-        # scan's readings
-        yield from load_panda_settings(panda=pandabox, design_name="pandabox_baseline")
+        # Captures the diodes alongside the camera
+        yield from load_panda_settings(
+            panda=pandabox,
+            design_name="pandabox_baseline",
+            whitelist_pvs=PANDABOX_WHITELIST,
+        )
         yield from fly_scan(
             spec,
             spectroscopy_detector,

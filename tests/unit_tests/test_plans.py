@@ -31,7 +31,11 @@ from test_rig_bluesky.plans import (
     serialize_spec,
     snapshot,
 )
-from test_rig_bluesky.spectroscopy_plans import demo_spectroscopy, spectroscopy
+from test_rig_bluesky.spectroscopy_plans import (
+    PANDABOX_WHITELIST,
+    demo_spectroscopy,
+    spectroscopy,
+)
 
 
 @pytest.fixture
@@ -429,7 +433,9 @@ def test_spectroscopy_fly_scan_uses_pandabox_and_diodes(
         )
 
     mock_load_panda_settings.assert_called_once_with(
-        panda=pandabox, design_name="pandabox_baseline"
+        panda=pandabox,
+        design_name="pandabox_baseline",
+        whitelist_pvs=PANDABOX_WHITELIST,
     )
     mock_fly_scan.assert_called_once()
     called_kwargs = mock_fly_scan.call_args.kwargs
