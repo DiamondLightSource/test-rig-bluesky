@@ -332,9 +332,8 @@ async def test_spectroscopy_sets_amplifier_range(
         )
     )
 
-    assert (
-        await spectroscopy_diodes.amplifier.range.get_value()
-        == EnzLocumRange.RANGE_10NA
+    get_mock_put(spectroscopy_diodes.amplifier.range).assert_called_once_with(
+        EnzLocumRange.RANGE_10NA
     )
     configuration = docs["descriptor"][0]["configuration"]["spectroscopy_diodes"]
     assert "spectroscopy_diodes-amplifier-range_max" in configuration["data"]
