@@ -1,16 +1,19 @@
 import asyncio
 import unittest.mock
 from collections import defaultdict
+from pathlib import Path
 from unittest.mock import ANY, AsyncMock, Mock, patch
 
 import dodal.beamlines.b01_1 as b01_1
 import pytest
+import yaml
 from bluesky import RunEngine
 from dodal.devices.beamlines.b01_1.diodes import RGBDiodes
 from dodal.devices.current_amplifiers import EnzLocumRange
 from dodal.devices.motors import XYZStage
 from ophyd_async.core import (
     callback_on_mock_put,
+    get_mock_put,
     set_mock_value,
 )
 from ophyd_async.epics.adaravis import AravisDetector
@@ -19,8 +22,10 @@ from ophyd_async.fastcs.panda import HDFPanda
 from ophyd_async.testing import assert_emitted
 from scanspec.specs import Line, Spec
 
+import test_rig_bluesky
 from test_rig_bluesky.plans import (
     ScanType,
+    fly_scan,
     load_settings,
     save_settings,
     serialize_spec,
@@ -54,6 +59,11 @@ def sample_stage(run_engine: RunEngine) -> XYZStage:
 @pytest.fixture
 def pandabrick(run_engine: RunEngine) -> HDFPanda:
     return b01_1.pandabrick.build(connect_immediately=True, mock=True)
+
+
+@pytest.fixture
+def pandabox(run_engine: RunEngine) -> HDFPanda:
+    return b01_1.pandabox.build(connect_immediately=True, mock=True)
 
 
 @pytest.fixture
@@ -356,3 +366,85 @@ def test_spectroscopy_rejects_auto_amplifier_range(
                 scan_type=ScanType.STEP,
             )
         )
+
+
+def test_fly_scan_rejects_pandabox_without_diodes(
+    run_engine: RunEngine,
+    spectroscopy_detector: AravisDetector,
+    sample_stage: XYZStage,
+    pandabox: HDFPanda,
+):
+    with pytest.raises(ValueError, match="pandabox was given without diodes"):
+        run_engine(
+            fly_scan(
+                Line(sample_stage.x, 0, 5, 5),
+                spectroscopy_detector,
+                pandabox=pandabox,
+            )
+        )
+
+
+def test_fly_scan_rejects_diodes_without_pandabox(
+    run_engine: RunEngine,
+    spectroscopy_detector: AravisDetector,
+    sample_stage: XYZStage,
+    spectroscopy_diodes: RGBDiodes,
+):
+    with pytest.raises(ValueError, match="diodes were given without pandabox"):
+        run_engine(
+            fly_scan(
+                Line(sample_stage.x, 0, 5, 5),
+                spectroscopy_detector,
+                diodes=spectroscopy_diodes,
+            )
+        )
+
+
+def test_spectroscopy_fly_scan_uses_pandabox_and_diodes(
+    run_engine: RunEngine,
+    spectroscopy_detector: AravisDetector,
+    sample_stage: XYZStage,
+    pandabrick: HDFPanda,
+    pandabox: HDFPanda,
+    spectroscopy_diodes: RGBDiodes,
+):
+    with (
+        unittest.mock.patch(
+            "test_rig_bluesky.spectroscopy_plans.load_panda_settings",
+            return_value=iter(()),
+        ) as mock_load_panda_settings,
+        unittest.mock.patch(
+            "test_rig_bluesky.spectroscopy_plans.fly_scan", return_value=iter(())
+        ) as mock_fly_scan,
+    ):
+        run_engine(
+            spectroscopy(
+                spectroscopy_detector=spectroscopy_detector,
+                sample_stage=sample_stage,
+                pandabrick=pandabrick,
+                pandabox=pandabox,
+                spectroscopy_diodes=spectroscopy_diodes,
+                scan_type=ScanType.FLY,
+            )
+        )
+
+    mock_load_panda_settings.assert_called_once_with(
+        panda=pandabox, design_name="pandabox_baseline"
+    )
+    mock_fly_scan.assert_called_once()
+    called_kwargs = mock_fly_scan.call_args.kwargs
+    assert called_kwargs["pandabox"] is pandabox
+    assert called_kwargs["diodes"] is spectroscopy_diodes
+
+
+def test_pandabox_baseline_captures_diodes_under_their_names(
+    spectroscopy_diodes: RGBDiodes,
+):
+    baseline = (
+        Path(test_rig_bluesky.__file__).parent / "baselines/pandabox_baseline.yaml"
+    )
+    datasets = yaml.safe_load(baseline.read_text())
+
+    assert datasets["fmc_in.val5_dataset"] == spectroscopy_diodes.red.name
+    assert datasets["fmc_in.val6_dataset"] == spectroscopy_diodes.green.name
+    assert datasets["fmc_in.val7_dataset"] == spectroscopy_diodes.blue.name
