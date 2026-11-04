@@ -194,6 +194,8 @@ def spectroscopy(
             spec,  # type: ignore
             metadata=metadata,
         )
+    else:
+        raise ValueError(f"Unsupported scan type: {scan_type}")
 
 
 def demo_spectroscopy(
