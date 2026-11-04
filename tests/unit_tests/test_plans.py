@@ -40,7 +40,6 @@ from test_rig_bluesky.spectroscopy_plans import (
 from test_rig_bluesky.tomography_plans import (
     SAMPLE_IN_X,
     SAMPLE_OUT_X,
-    LightSource,
     tomography,
 )
 
@@ -520,7 +519,6 @@ def test_tomography_takes_darks_then_flats_then_projections(
 
     run_engine(
         tomography(
-            LightSource.LED,
             detector=tomography_detector,
             stage=tomography_stage,
             tomography_flip_mirror=tomography_flip_mirror,
@@ -536,7 +534,6 @@ def test_tomography_takes_darks_then_flats_then_projections(
     assert [start["image_key"] for start in starts] == ["dark", "flat", "projection"]
     assert [start["num_points"] for start in starts] == [2, 3, 4]
     assert len({start["tomography_group"] for start in starts}) == 1
-    assert all(start["light_source"] == "led" for start in starts)
     assert projections["darks_uid"] == darks["uid"]
     assert projections["flats_uid"] == flats["uid"]
 
@@ -552,13 +549,20 @@ def test_tomography_takes_darks_then_flats_then_projections(
         )
     ]
     assert sets_and_opens == [
+        # Darks: sample out, no light
         ("set", tomography_stage.x, (SAMPLE_OUT_X,)),
         ("set", spectroscopy_flip_mirror, (False,)),
         ("set", tomography_flip_mirror, (False,)),
         ("open_run", None, ()),
+        # Flats: sample out, light on
+        ("set", tomography_stage.x, (SAMPLE_OUT_X,)),
+        ("set", spectroscopy_flip_mirror, (False,)),
         ("set", tomography_flip_mirror, (True,)),
         ("open_run", None, ()),
+        # Projections: sample in, light on
         ("set", tomography_stage.x, (SAMPLE_IN_X,)),
+        ("set", spectroscopy_flip_mirror, (False,)),
+        ("set", tomography_flip_mirror, (True,)),
         ("open_run", None, ()),
         # Mirrors put back as they were
         ("set", tomography_flip_mirror, (True,)),
@@ -579,7 +583,6 @@ async def test_tomography_restores_mirrors_on_failure(
         with pytest.raises(RuntimeError, match="boom"):
             run_engine(
                 tomography(
-                    LightSource.LED,
                     detector=tomography_detector,
                     stage=tomography_stage,
                     tomography_flip_mirror=tomography_flip_mirror,
