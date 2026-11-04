@@ -54,6 +54,8 @@ class ScanType(StrEnum):
 
 # foo bar
 
+# great
+
 pmac = inject("pmac")
 pandabrick = inject("pandabrick")
 
