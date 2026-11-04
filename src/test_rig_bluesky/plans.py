@@ -46,6 +46,8 @@ class ScanType(StrEnum):
     FLY = "fly"
     STEP = "step"
 
+# my change
+
 
 pmac = inject("pmac")
 pandabrick = inject("pandabrick")
