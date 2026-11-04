@@ -524,15 +524,14 @@ def test_tomography_takes_darks_then_flats_then_projections(
             tomography_flip_mirror=tomography_flip_mirror,
             spectroscopy_flip_mirror=spectroscopy_flip_mirror,
             spec=Line(tomography_stage.theta, 0, 3, 4),
-            num_darks=2,
-            num_flats=3,
+            num_calibration_images=2,
             scan_type=ScanType.STEP,
         )
     )
 
     darks, flats, projections = starts
     assert [start["image_key"] for start in starts] == ["dark", "flat", "projection"]
-    assert [start["num_points"] for start in starts] == [2, 3, 4]
+    assert [start["num_points"] for start in starts] == [2, 2, 4]
     assert len({start["tomography_group"] for start in starts}) == 1
     assert projections["darks_uid"] == darks["uid"]
     assert projections["flats_uid"] == flats["uid"]
@@ -564,33 +563,4 @@ def test_tomography_takes_darks_then_flats_then_projections(
         ("set", spectroscopy_flip_mirror, (False,)),
         ("set", tomography_flip_mirror, (True,)),
         ("open_run", None, ()),
-        # Mirrors put back as they were
-        ("set", tomography_flip_mirror, (True,)),
-        ("set", spectroscopy_flip_mirror, (True,)),
     ]
-
-
-async def test_tomography_restores_mirrors_on_failure(
-    run_engine: RunEngine,
-    tomography_detector: AravisDetector,
-    tomography_stage: XThetaStage,
-    tomography_flip_mirror: FlipMirror,
-    spectroscopy_flip_mirror: FlipMirror,
-):
-    with patch(
-        "test_rig_bluesky.tomography_plans.count", side_effect=RuntimeError("boom")
-    ):
-        with pytest.raises(RuntimeError, match="boom"):
-            run_engine(
-                tomography(
-                    detector=tomography_detector,
-                    stage=tomography_stage,
-                    tomography_flip_mirror=tomography_flip_mirror,
-                    spectroscopy_flip_mirror=spectroscopy_flip_mirror,
-                    spec=Line(tomography_stage.theta, 0, 3, 4),
-                    scan_type=ScanType.STEP,
-                )
-            )
-
-    assert await tomography_flip_mirror.position.get_value() is True
-    assert await spectroscopy_flip_mirror.position.get_value() is True

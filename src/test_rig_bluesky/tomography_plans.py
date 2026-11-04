@@ -104,7 +104,9 @@ STAGE_WHITELIST = [
 PANDA_WHITELIST = ["incenc-8-val_dataset"]
 
 
-def _setup_detector(detector: AravisDetector, exposure_time: float) -> MsgGenerator:
+def _setup_detector(
+    detector: AravisDetector, exposure_time: float
+) -> MsgGenerator[None]:
     """Put the detector in its scanning state."""
     # ---- load baseline settings ----------------------------------------------
     yield from load_settings(
@@ -131,7 +133,7 @@ def _move_for(
     stage: XThetaStage,
     tomography_flip_mirror: FlipMirror,
     spectroscopy_flip_mirror: FlipMirror,
-) -> MsgGenerator:
+) -> MsgGenerator[None]:
     """Move the sample and mirrors into place for this type of image."""
     sample_x, light_on = SAMPLE_X_AND_LIGHT[image_type]
     yield from bps.mv(
@@ -158,7 +160,7 @@ def _collect_calibration(
     )
     return (
         yield from count(
-            [detector], num=num_images, md={IMAGE_KEY: image_type.value, **metadata}
+            [detector], num=num_images, md={**metadata, IMAGE_KEY: image_type.value}
         )
     )
 
@@ -174,7 +176,7 @@ def _collect_projections(
     exposure_time: float,
     metadata: dict[str, Any],
     scan_type: ScanType,
-) -> MsgGenerator:
+) -> MsgGenerator[None]:
     """Collect projections over spec, by fly or step scan."""
     # ---- move sample in, light on --------------------------------------------
     yield from _move_for(
@@ -183,13 +185,13 @@ def _collect_projections(
 
     # ---- build metadata ------------------------------------------------------
     metadata = {
+        **metadata,
         IMAGE_KEY: ImageType.PROJECTION.value,
         "spec": serialize_spec(spec),
-        **metadata,
     }
 
-    # ---- scan ----------------------------------------------------------------
     if scan_type == ScanType.FLY:
+        # ---- fly scan --------------------------------------------------------
         LOGGER.info("Performing a tomography fly scan.")
         yield from fly_scan(
             spec,
@@ -204,61 +206,16 @@ def _collect_projections(
             metadata=metadata,
         )
     elif scan_type == ScanType.STEP:
+        # ---- step scan -------------------------------------------------------
         LOGGER.info("Performing a tomography step scan.")
         yield from spec_scan(
             {detector, stage},
             spec,  # type: ignore
             metadata=metadata,
         )
-
-
-def _collect_images(
-    spec: Spec[Movable],
-    detector: AravisDetector,
-    stage: XThetaStage,
-    tomography_flip_mirror: FlipMirror,
-    spectroscopy_flip_mirror: FlipMirror,
-    pmac: PmacIO,
-    pandabrick: HDFPanda,
-    exposure_time: float,
-    num_darks: int,
-    num_flats: int,
-    metadata: dict[str, Any],
-    scan_type: ScanType,
-) -> MsgGenerator:
-    """Darks, then flats, then projections linked to both."""
-    mirrors = (tomography_flip_mirror, spectroscopy_flip_mirror)
-
-    # ---- collect darks -------------------------------------------------------
-    darks_uid = yield from _collect_calibration(
-        ImageType.DARK, num_darks, detector, stage, *mirrors, metadata
-    )
-
-    # ---- collect flats -------------------------------------------------------
-    flats_uid = yield from _collect_calibration(
-        ImageType.FLAT, num_flats, detector, stage, *mirrors, metadata
-    )
-
-    # ---- collect projections -------------------------------------------------
-    yield from _collect_projections(
-        spec,
-        detector,
-        stage,
-        *mirrors,
-        pmac,
-        pandabrick,
-        exposure_time,
-        {DARKS_UID_KEY: darks_uid, FLATS_UID_KEY: flats_uid, **metadata},
-        scan_type,
-    )
-
-
-def _restoring_mirrors(plan: MsgGenerator, *mirrors: FlipMirror) -> MsgGenerator:
-    """Run plan, then put the mirrors back where they were, even if it fails."""
-    initial_positions = []
-    for mirror in mirrors:
-        initial_positions += [mirror, (yield from bps.rd(mirror.position))]
-    return (yield from bpp.finalize_wrapper(plan, bps.mv(*initial_positions)))
+    else:
+        # ---- unsupported scan type -------------------------------------------
+        raise ValueError(f"Unsupported scan type: {scan_type}")
 
 
 def _wind_back(stage: XThetaStage, start_angle: float) -> MsgGenerator[None]:
@@ -278,12 +235,11 @@ def tomography(
     pandabrick: HDFPanda = pandabrick,
     exposure_time: float = 0.1,
     spec: Spec[Movable] | None = None,
-    num_darks: int = 20,
-    num_flats: int = 20,
+    num_calibration_images: int = 20,
     metadata: dict[str, Any] | None = None,
     *,
     scan_type: ScanType,
-) -> MsgGenerator:
+) -> MsgGenerator[None]:
     """Do a tomography scan: darks, then flats with the sample out, then projections."""
     # ---- set up detector and stage -------------------------------------------
     yield from _setup_detector(detector, exposure_time)
@@ -296,26 +252,40 @@ def tomography(
     # ---- define scan ---------------------------------------------------------
     # One projection per degree over a full rotation
     spec = spec or Line(stage.theta, 0, 359, 360)  # type: ignore
-    shared_metadata = {GROUP_KEY: str(uuid4()), **(metadata or {})}
+    shared_metadata = {**(metadata or {}), GROUP_KEY: str(uuid4())}
+    mirrors = (tomography_flip_mirror, spectroscopy_flip_mirror)
 
-    # ---- collect darks, flats and projections, then restore mirrors ----------
-    yield from _restoring_mirrors(
-        _collect_images(
-            spec,
-            detector,
-            stage,
-            tomography_flip_mirror,
-            spectroscopy_flip_mirror,
-            pmac,
-            pandabrick,
-            exposure_time,
-            num_darks,
-            num_flats,
-            shared_metadata,
-            scan_type,
-        ),
-        tomography_flip_mirror,
-        spectroscopy_flip_mirror,
+    # ---- collect darks -------------------------------------------------------
+    darks_uid = yield from _collect_calibration(
+        ImageType.DARK,
+        num_calibration_images,
+        detector,
+        stage,
+        *mirrors,
+        shared_metadata,
+    )
+
+    # ---- collect flats -------------------------------------------------------
+    flats_uid = yield from _collect_calibration(
+        ImageType.FLAT,
+        num_calibration_images,
+        detector,
+        stage,
+        *mirrors,
+        shared_metadata,
+    )
+
+    # ---- collect projections -------------------------------------------------
+    yield from _collect_projections(
+        spec,
+        detector,
+        stage,
+        *mirrors,
+        pmac,
+        pandabrick,
+        exposure_time,
+        {**shared_metadata, DARKS_UID_KEY: darks_uid, FLATS_UID_KEY: flats_uid},
+        scan_type,
     )
 
 
