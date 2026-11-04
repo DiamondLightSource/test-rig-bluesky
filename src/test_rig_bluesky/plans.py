@@ -106,7 +106,7 @@ def serialize_spec(spec: Spec[Any]) -> Any:
     """Render a Spec as something JSON-serializable, for scan metadata.
 
     Axes that are devices are written out by their ``name`` (e.g.
-    ``"sample_stage-x"``), so consumers of the run's start document can tell
+    ``"spectroscopy_stage-x"``), so consumers of the run's start document can tell
     which axis is which.
     """
     return spec.serialize()

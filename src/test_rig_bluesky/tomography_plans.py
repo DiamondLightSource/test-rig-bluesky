@@ -3,6 +3,7 @@
 import logging
 from enum import StrEnum
 from typing import Annotated, Any
+from uuid import uuid4
 
 import bluesky.plan_stubs as bps
 import bluesky.preprocessors as bpp
@@ -10,10 +11,11 @@ from bluesky.plans import count
 from bluesky.protocols import Movable
 from bluesky.utils import MsgGenerator
 from dodal.common import inject
+from dodal.devices.beamlines.b01_1.flip_mirror import FlipMirror
+from dodal.devices.motors import XThetaStage
 from dodal.plans import spec_scan
 from ophyd_async.core import DetectorTrigger
 from ophyd_async.epics.adaravis import AravisDetector
-from ophyd_async.epics.motor import Motor
 from ophyd_async.epics.pmac import PmacIO
 from ophyd_async.fastcs.panda import HDFPanda
 from pydantic import Field
@@ -24,21 +26,47 @@ from .plans import ScanType, fly_scan, load_settings, pandabrick, pmac, serializ
 LOGGER = logging.getLogger(__name__)
 
 # pmac and pandabrick come from plans.py
-tomography_detector = inject("tomography_detector")
-tomography_stage = inject("tomography_stage")
+detector = inject("tomography_detector")
+stage = inject("tomography_stage")
+tomography_flip_mirror = inject("tomography_flip_mirror")
+spectroscopy_flip_mirror = inject("spectroscopy_flip_mirror")
 
 
 class LightSource(StrEnum):
-    """The illumination in use."""
+    """Deprecated: only kept so the demo_tomography API doesn't change. Ignored."""
 
     LED = "led"
     SR = "sr"
     DARK = "dark"
 
 
-# Metadata keys the reconstruction workflow reads to pair projections with the
-# calibration images taken under the same illumination
-LIGHT_SOURCE_KEY = "light_source"
+class ImageType(StrEnum):
+    """What a run of images is, so the reconstruction workflow can tell them apart."""
+
+    DARK = "dark"
+    FLAT = "flat"
+    PROJECTION = "projection"
+
+
+# Metadata key holding the run's ImageType
+IMAGE_KEY = "image_key"
+# Shared by the darks, flats and projections runs of one tomography scan
+GROUP_KEY = "tomography_group"
+# Recorded on the projections run, pointing at its calibration runs
+DARKS_UID_KEY = "darks_uid"
+FLATS_UID_KEY = "flats_uid"
+
+# Tomography stage x positions, in mm
+SAMPLE_OUT_X = 0.0  # TODO: placeholder, sample out of the field of view for flats
+SAMPLE_IN_X = 0.0  # TODO: placeholder, sample back in the field of view
+
+# Where the sample sits and whether the tomography light is on for each image type.
+# The spectroscopy mirror is always flipped out of the way.
+SAMPLE_X_AND_LIGHT: dict[ImageType, tuple[float, bool]] = {
+    ImageType.DARK: (SAMPLE_OUT_X, False),
+    ImageType.FLAT: (SAMPLE_OUT_X, True),
+    ImageType.PROJECTION: (SAMPLE_IN_X, True),
+}
 
 MIN_PROJECTIONS = 30
 MAX_PROJECTIONS = 1440
@@ -54,10 +82,10 @@ NumProjections = Annotated[
 
 
 # TODO: conservative estimates for now
-MAKO_ACQUIRE_PERIOD_PAD = 25e-3
-MAKO_DETECTOR_DEADTIME = 25e-3
+ALVIUM_ACQUIRE_PERIOD_PAD = 25e-3
+ALVIUM_DETECTOR_DEADTIME = 25e-3
 
-TOMOGRAPHY_DETECTOR_TRIGGER = DetectorTrigger.EXTERNAL_EDGE
+DETECTOR_TRIGGER = DetectorTrigger.EXTERNAL_EDGE
 
 DETECTOR_WHITELIST = [
     "hdf-nd_array_port",
@@ -67,9 +95,9 @@ DETECTOR_WHITELIST = [
     "driver-trigger_source",
 ]
 
-TOMOGRAPHY_STAGE_WHITELIST = [
-    "acceleration_time",
-    "velocity",
+STAGE_WHITELIST = [
+    "theta-acceleration_time",
+    "theta-velocity",
 ]
 
 # TODO: confirm which PandA encoder input the rotation axis is wired to.
@@ -77,119 +105,196 @@ PANDA_WHITELIST = ["incenc-8-val_dataset"]
 
 
 def _setup_detector(
-    detector: AravisDetector,
-    exposure_time: float,
+    detector: AravisDetector, exposure_time: float
 ) -> MsgGenerator[None]:
     """Put the detector in its scanning state."""
+    # ---- load baseline settings ----------------------------------------------
     yield from load_settings(
         device=detector,
         design_name="tomography_detector_baseline",
         whitelist_pvs=DETECTOR_WHITELIST,
     )
 
+    # ---- set exposure --------------------------------------------------------
     # mv rather than prepare, because prepare cannot be used outside a run.
     # See: https://github.com/DiamondLightSource/blueapi/issues/1211
     yield from bps.mv(
         *(detector.driver.acquire_time, exposure_time),
         *(
             detector.driver.acquire_period,
-            exposure_time + MAKO_ACQUIRE_PERIOD_PAD,
+            exposure_time + ALVIUM_ACQUIRE_PERIOD_PAD,
         ),
-        group="tomography_detector_acquire",
+        group="detector_acquire",
     )
 
 
-# @attach_data_session_metadata_decorator()
-def darks_flats(
-    light_source: LightSource,
-    tomography_detector: AravisDetector = tomography_detector,
-    num_images: int = 20,
-    exposure_time: float = 0.1,
-    metadata: dict[str, Any] | None = None,
+def _move_for(
+    image_type: ImageType,
+    stage: XThetaStage,
+    tomography_flip_mirror: FlipMirror,
+    spectroscopy_flip_mirror: FlipMirror,
 ) -> MsgGenerator[None]:
-    """Collect flat or dark field images for the reconstruction to normalise with.
+    """Move the sample and mirrors into place for this type of image."""
+    sample_x, light_on = SAMPLE_X_AND_LIGHT[image_type]
+    yield from bps.mv(
+        *(stage.x, sample_x),
+        *(spectroscopy_flip_mirror, False),
+        *(tomography_flip_mirror, light_on),
+        group=f"move_for_{image_type.value}",
+    )
 
-    Recorded in the run's metadata under "light_source" so the workflow can find
-    the right images for a given scan. LightSource.NONE means the beam is off,
-    i.e. dark fields, and one such set serves every illumination.
 
-    :param light_source: illumination the images are taken under, or
-        LightSource.NONE for dark fields.
-    """
-    run_metadata: dict[str, Any] = {LIGHT_SOURCE_KEY: light_source.value}
-    run_metadata.update(metadata or {})
-
-    if light_source is LightSource.DARK:
-        LOGGER.info("Collecting %d dark images.", num_images)
-    else:
-        LOGGER.info(
-            "Collecting %d flat images under %s illumination.",
-            num_images,
-            light_source.value,
+def _collect_calibration(
+    image_type: ImageType,
+    num_images: int,
+    detector: AravisDetector,
+    stage: XThetaStage,
+    tomography_flip_mirror: FlipMirror,
+    spectroscopy_flip_mirror: FlipMirror,
+    metadata: dict[str, Any],
+) -> MsgGenerator[str]:
+    """Collect dark or flat images, returning the run's uid."""
+    LOGGER.info("Collecting %d %s images.", num_images, image_type.value)
+    yield from _move_for(
+        image_type, stage, tomography_flip_mirror, spectroscopy_flip_mirror
+    )
+    return (
+        yield from count(
+            [detector], num=num_images, md={**metadata, IMAGE_KEY: image_type.value}
         )
-
-    yield from _setup_detector(tomography_detector, exposure_time)
-
-    yield from count([tomography_detector], num=num_images, md=run_metadata)
+    )
 
 
-def tomography(
-    light_source: LightSource,
-    tomography_detector: AravisDetector = tomography_detector,
-    tomography_stage: Motor = tomography_stage,
-    pmac: PmacIO = pmac,
-    pandabrick: HDFPanda = pandabrick,
-    exposure_time: float = 0.1,
-    spec: Spec[Movable] | None = None,
-    metadata: dict[str, Any] | None = None,
-    *,
+def _collect_projections(
+    spec: Spec[Movable],
+    detector: AravisDetector,
+    stage: XThetaStage,
+    tomography_flip_mirror: FlipMirror,
+    spectroscopy_flip_mirror: FlipMirror,
+    pmac: PmacIO,
+    pandabrick: HDFPanda,
+    exposure_time: float,
+    metadata: dict[str, Any],
     scan_type: ScanType,
 ) -> MsgGenerator[None]:
-    """Do a tomography scan."""
-    yield from _setup_detector(tomography_detector, exposure_time)
-
-    yield from load_settings(
-        device=tomography_stage,
-        design_name="tomography_stage_baseline",
-        whitelist_pvs=TOMOGRAPHY_STAGE_WHITELIST,
+    """Collect projections over spec, by fly or step scan."""
+    # ---- move sample in, light on --------------------------------------------
+    yield from _move_for(
+        ImageType.PROJECTION, stage, tomography_flip_mirror, spectroscopy_flip_mirror
     )
 
-    # One projection per degree over a full rotation
-    spec = spec or Line(tomography_stage, 0, 359, 360)  # type: ignore
-
-    if metadata is None:
-        metadata = {}
-    metadata["spec"] = serialize_spec(spec)
-    # Tells the workflow which calibration images belong with these projections.
-    metadata[LIGHT_SOURCE_KEY] = light_source.value
+    # ---- build metadata ------------------------------------------------------
+    metadata = {
+        **metadata,
+        IMAGE_KEY: ImageType.PROJECTION.value,
+        "spec": serialize_spec(spec),
+    }
 
     if scan_type == ScanType.FLY:
+        # ---- fly scan --------------------------------------------------------
         LOGGER.info("Performing a tomography fly scan.")
         yield from fly_scan(
             spec,
-            tomography_detector,
+            detector,
             pmac=pmac,
             pandabrick=pandabrick,
             exposure_time=exposure_time,
-            detector_deadtime=MAKO_DETECTOR_DEADTIME,
-            detector_trigger=TOMOGRAPHY_DETECTOR_TRIGGER,
+            detector_deadtime=ALVIUM_DETECTOR_DEADTIME,
+            detector_trigger=DETECTOR_TRIGGER,
             panda_whitelist=PANDA_WHITELIST,
             plan_name="tomography_fly_scan",
             metadata=metadata,
         )
     elif scan_type == ScanType.STEP:
+        # ---- step scan -------------------------------------------------------
         LOGGER.info("Performing a tomography step scan.")
         yield from spec_scan(
-            {tomography_detector, tomography_stage},
+            {detector, stage},
             spec,  # type: ignore
             metadata=metadata,
         )
+    else:
+        # ---- unsupported scan type -------------------------------------------
+        raise ValueError(f"Unsupported scan type: {scan_type}")
+
+
+def _wind_back(stage: XThetaStage, start_angle: float) -> MsgGenerator[None]:
+    # unwind to leave the stage where the next scan expects it.
+    # currently this winds back the full rotation but should look
+    # into changing it so that we just advance one step to the
+    # beginning again and reset the angle to 0?
+    yield from bps.mv(stage.theta, start_angle, group="wind_back")
+
+
+def tomography(
+    detector: AravisDetector = detector,
+    stage: XThetaStage = stage,
+    tomography_flip_mirror: FlipMirror = tomography_flip_mirror,
+    spectroscopy_flip_mirror: FlipMirror = spectroscopy_flip_mirror,
+    pmac: PmacIO = pmac,
+    pandabrick: HDFPanda = pandabrick,
+    exposure_time: float = 0.1,
+    spec: Spec[Movable] | None = None,
+    num_calibration_images: int = 20,
+    metadata: dict[str, Any] | None = None,
+    *,
+    scan_type: ScanType,
+) -> MsgGenerator[None]:
+    """Do a tomography scan: darks, then flats with the sample out, then projections."""
+    # ---- set up detector and stage -------------------------------------------
+    yield from _setup_detector(detector, exposure_time)
+    yield from load_settings(
+        device=stage,
+        design_name="tomography_stage_baseline",
+        whitelist_pvs=STAGE_WHITELIST,
+    )
+
+    # ---- define scan ---------------------------------------------------------
+    # One projection per degree over a full rotation
+    spec = spec or Line(stage.theta, 0, 359, 360)  # type: ignore
+    shared_metadata = {**(metadata or {}), GROUP_KEY: str(uuid4())}
+    mirrors = (tomography_flip_mirror, spectroscopy_flip_mirror)
+
+    # ---- collect darks -------------------------------------------------------
+    darks_uid = yield from _collect_calibration(
+        ImageType.DARK,
+        num_calibration_images,
+        detector,
+        stage,
+        *mirrors,
+        shared_metadata,
+    )
+
+    # ---- collect flats -------------------------------------------------------
+    flats_uid = yield from _collect_calibration(
+        ImageType.FLAT,
+        num_calibration_images,
+        detector,
+        stage,
+        *mirrors,
+        shared_metadata,
+    )
+
+    # ---- collect projections -------------------------------------------------
+    yield from _collect_projections(
+        spec,
+        detector,
+        stage,
+        *mirrors,
+        pmac,
+        pandabrick,
+        exposure_time,
+        {**shared_metadata, DARKS_UID_KEY: darks_uid, FLATS_UID_KEY: flats_uid},
+        scan_type,
+    )
 
 
 def demo_tomography(
-    light_source: LightSource,
-    tomography_detector: AravisDetector = tomography_detector,
-    tomography_stage: Motor = tomography_stage,
+    light_source: LightSource,  # deprecated
+    detector: AravisDetector = detector,
+    stage: XThetaStage = stage,
+    tomography_flip_mirror: FlipMirror = tomography_flip_mirror,
+    spectroscopy_flip_mirror: FlipMirror = spectroscopy_flip_mirror,
     pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
     number_of_projections: NumProjections = 360,
@@ -201,29 +306,27 @@ def demo_tomography(
     scan_type: ScanType,
 ) -> MsgGenerator[None]:
     """Tomography plan intended for use in Visr demonstrations to visitors.
-    Takes number_of_projections evenly spaced over angular_range from start_angle,
-    then winds the stage back to start_angle.
-    """
+    Takes darks and flats, then number_of_projections evenly spaced over
+    angular_range from start_angle, then winds the stage back to start_angle."""
+    del light_source
+
+    # ---- define projections --------------------------------------------------
     angular_step = angular_range / number_of_projections
     last_angle = start_angle + angular_range - angular_step
-    spec = Line(tomography_stage, start_angle, last_angle, number_of_projections)  # type: ignore
+    spec = Line(stage.theta, start_angle, last_angle, number_of_projections)  # type: ignore
 
+    # ---- move to start -------------------------------------------------------
     # PMAC handles the run-up, but move to the nominal start first so a failure
     # here is reported before the trajectory is built.
-    yield from bps.mv(tomography_stage, start_angle, group="initial_move")
+    yield from bps.mv(stage.theta, start_angle, group="initial_move")
 
-    def wind_back() -> MsgGenerator[None]:
-        # unwind to leave the stage where the next scan expects it.
-        # currently this winds back the full rotation but should look
-        # into changing it so that we just advance one step to the
-        # beginning again and reset the angle to 0?
-        yield from bps.mv(tomography_stage, start_angle, group="wind_back")
-
+    # ---- run tomography, then wind back --------------------------------------
     yield from bpp.finalize_wrapper(
         tomography(
-            light_source,
-            tomography_detector=tomography_detector,
-            tomography_stage=tomography_stage,
+            detector=detector,
+            stage=stage,
+            tomography_flip_mirror=tomography_flip_mirror,
+            spectroscopy_flip_mirror=spectroscopy_flip_mirror,
             pmac=pmac,
             pandabrick=pandabrick,
             exposure_time=exposure_time,
@@ -231,5 +334,5 @@ def demo_tomography(
             metadata=metadata,
             scan_type=scan_type,
         ),
-        wind_back,
+        _wind_back(stage, start_angle),
     )
