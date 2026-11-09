@@ -130,7 +130,7 @@ def fly_scan(
     exposure_time: float = 0.1,
     detector_deadtime: float = 2e-3 * 1.01,
     detector_trigger: DetectorTrigger = DetectorTrigger.EXTERNAL_EDGE,
-    panda_whitelist: list[str] | None = None,
+    pandabrick_whitelist: list[str] | None = None,
     plan_name: str = "fly_scan",
     metadata: dict[str, Any] | None = None,
     pandabox: HDFPanda | None = None,
@@ -149,7 +149,7 @@ def fly_scan(
     yield from load_panda_settings(
         panda=pandabrick,
         design_name="pandabrick_baseline",
-        whitelist_pvs=panda_whitelist,
+        whitelist_pvs=pandabrick_whitelist,
     )
 
     scan_frame_duration = exposure_time
