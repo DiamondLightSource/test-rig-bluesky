@@ -186,7 +186,7 @@ def spectroscopy(
             pandabrick=pandabrick,
             exposure_time=exposure_time,
             detector_deadtime=MANTA_DETECTOR_DEADTIME,
-            panda_whitelist=PANDA_WHITELIST,
+            pandabrick_whitelist=PANDA_WHITELIST,
             metadata=metadata,
             pandabox=pandabox,
             diodes=spectroscopy_diodes,
