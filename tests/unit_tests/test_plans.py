@@ -4,10 +4,12 @@ from collections import defaultdict
 from pathlib import Path
 from unittest.mock import ANY, AsyncMock, Mock, patch
 
+import bluesky.preprocessors as bpp
 import dodal.beamlines.b01_1 as b01_1
 import pytest
 import yaml
 from bluesky import RunEngine
+from bluesky.utils import Msg
 from dodal.devices.beamlines.b01_1.diodes import RGBDiodes
 from dodal.devices.beamlines.b01_1.flip_mirror import FlipMirror
 from dodal.devices.current_amplifiers import EnzLocumRange
@@ -512,20 +514,27 @@ def test_tomography_takes_darks_then_flats_then_projections(
     tomography_flip_mirror: FlipMirror,
     spectroscopy_flip_mirror: FlipMirror,
 ):
-    messages = []
-    run_engine.msg_hook = messages.append
+    messages: list[Msg] = []
+
+    def record(msg: Msg) -> Msg:
+        messages.append(msg)
+        return msg
+
     starts = []
     run_engine.subscribe(lambda name, doc: starts.append(doc), "start")
 
     run_engine(
-        tomography(
-            detector=tomography_detector,
-            stage=tomography_stage,
-            tomography_flip_mirror=tomography_flip_mirror,
-            spectroscopy_flip_mirror=spectroscopy_flip_mirror,
-            spec=Line(tomography_stage.theta, 0, 3, 4),
-            num_calibration_images=2,
-            scan_type=ScanType.STEP,
+        bpp.msg_mutator(
+            tomography(
+                detector=tomography_detector,
+                stage=tomography_stage,
+                tomography_flip_mirror=tomography_flip_mirror,
+                spectroscopy_flip_mirror=spectroscopy_flip_mirror,
+                spec=Line(tomography_stage.theta, 0, 3, 4),
+                num_calibration_images=2,
+                scan_type=ScanType.STEP,
+            ),
+            record,
         )
     )
 
