@@ -32,14 +32,6 @@ tomography_flip_mirror = inject("tomography_flip_mirror")
 spectroscopy_flip_mirror = inject("spectroscopy_flip_mirror")
 
 
-class LightSource(StrEnum):
-    """Deprecated: only kept so the demo_tomography API doesn't change. Ignored."""
-
-    LED = "led"
-    SR = "sr"
-    DARK = "dark"
-
-
 class ImageType(StrEnum):
     """What a run of images is, so the reconstruction workflow can tell them apart."""
 
@@ -290,7 +282,6 @@ def tomography(
 
 
 def demo_tomography(
-    light_source: LightSource,  # deprecated
     detector: AravisDetector = detector,
     stage: XThetaStage = stage,
     tomography_flip_mirror: FlipMirror = tomography_flip_mirror,
@@ -308,7 +299,6 @@ def demo_tomography(
     """Tomography plan intended for use in Visr demonstrations to visitors.
     Takes darks and flats, then number_of_projections evenly spaced over
     angular_range from start_angle, then winds the stage back to start_angle."""
-    del light_source
 
     # ---- define projections --------------------------------------------------
     angular_step = angular_range / number_of_projections
