@@ -18,7 +18,7 @@ def test_snapshot(
             params={
                 "devices": [
                     "spectroscopy_detector",
-                    "sample_stage",
+                    "spectroscopy_stage",
                 ]
             },
             instrument_session=latest_commissioning_instrument_session,
@@ -31,8 +31,8 @@ def test_snapshot(
 def test_spectroscopy_with_custom_trajectory(
     bluesky_plan_runner: BlueskyPlanRunner, latest_commissioning_instrument_session: str
 ):
-    scan_spec = Line("sample_stage.x", 0.0, 5.0, 5) * Line(
-        "sample_stage.y", 2.0, 5.0, 3
+    scan_spec = Line("spectroscopy_stage.x", 0.0, 5.0, 5) * Line(
+        "spectroscopy_stage.y", 2.0, 5.0, 3
     )
     events = bluesky_plan_runner.run(
         TaskRequest(
@@ -97,8 +97,8 @@ def test_generic_count(
 def test_generic_scan(
     bluesky_plan_runner: BlueskyPlanRunner, latest_commissioning_instrument_session: str
 ) -> None:
-    scan_spec = Line("sample_stage.x", 0.0, 5.0, 2) * Line(
-        "sample_stage.y", 2.0, 5.0, 2
+    scan_spec = Line("spectroscopy_stage.x", 0.0, 5.0, 2) * Line(
+        "spectroscopy_stage.y", 2.0, 5.0, 2
     )
     bluesky_plan_runner.run(
         TaskRequest(
@@ -117,7 +117,7 @@ def test_generic_scan(
 def test_spectroscopy_re():
     run_engine = RunEngine()
     spectroscopy_detector = b01_1.spectroscopy_detector.build(connect_immediately=True)
-    sample_stage = b01_1.sample_stage.build(connect_immediately=True)
+    sample_stage = b01_1.spectroscopy_stage.build(connect_immediately=True)
 
     scan_spec = Line(sample_stage.y, 0, 5, 50) * Line(sample_stage.x, 2, 5, 30)
 
@@ -168,7 +168,7 @@ def test_spectroscopy_re_run_engine():
     run_engine = RunEngine()
 
     spectroscopy_detector = b01_1.spectroscopy_detector.build(connect_immediately=True)
-    sample_stage = b01_1.sample_stage.build(connect_immediately=True)
+    sample_stage = b01_1.spectroscopy_stage.build(connect_immediately=True)
 
     scan_spec = Line(sample_stage.y, 0, 5, 50) * Line(sample_stage.x, 2, 5, 30)
 
