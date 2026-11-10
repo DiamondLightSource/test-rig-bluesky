@@ -46,7 +46,7 @@ def spectroscopy_detector(run_engine: RunEngine) -> AravisDetector:
 
 
 @pytest.fixture
-def sample_stage(run_engine: RunEngine) -> XYZStage:
+def spectroscopy_stage(run_engine: RunEngine) -> XYZStage:
     stage = b01_1.spectroscopy_stage.build(connect_immediately=True, mock=True)
 
     set_mock_value(stage.x.low_limit_travel, -10.0)
@@ -143,12 +143,12 @@ async def test_load_settings(
 def test_snapshot(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
 ):
     docs = defaultdict(list)
     run_engine.subscribe(lambda name, doc: docs[name].append(doc))
 
-    run_engine(snapshot([spectroscopy_detector, sample_stage]))
+    run_engine(snapshot([spectroscopy_detector, spectroscopy_stage]))
 
     assert_emitted(
         docs, start=1, descriptor=1, stream_resource=1, stream_datum=1, event=1, stop=1
@@ -164,7 +164,7 @@ def test_snapshot(
 async def test_spectroscopy(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     pandabrick: HDFPanda,
     spectroscopy_diodes: RGBDiodes,
 ):
@@ -174,10 +174,11 @@ async def test_spectroscopy(
     run_engine(
         spectroscopy(
             spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
+            spectroscopy_stage=spectroscopy_stage,
             pandabrick=pandabrick,
             spectroscopy_diodes=spectroscopy_diodes,
-            spec=Line(sample_stage.y, 4.2, 6, 3) * Line(sample_stage.x, 0, 5, 10),
+            spec=Line(spectroscopy_stage.y, 4.2, 6, 3)
+            * Line(spectroscopy_stage.x, 0, 5, 10),
             exposure_time=0.2,
             scan_type=ScanType.STEP,
         )
@@ -199,7 +200,7 @@ async def test_spectroscopy(
 async def test_spectroscopy_defaults(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     pandabrick: HDFPanda,
     spectroscopy_diodes: RGBDiodes,
 ):
@@ -209,7 +210,7 @@ async def test_spectroscopy_defaults(
     run_engine(
         spectroscopy(
             spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
+            spectroscopy_stage=spectroscopy_stage,
             pandabrick=pandabrick,
             spectroscopy_diodes=spectroscopy_diodes,
             scan_type=ScanType.STEP,
@@ -232,7 +233,7 @@ async def test_spectroscopy_defaults(
 def test_spectroscopy_datasets(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     pandabrick: HDFPanda,
     spectroscopy_diodes: RGBDiodes,
 ):
@@ -242,7 +243,7 @@ def test_spectroscopy_datasets(
     run_engine(
         spectroscopy(
             spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
+            spectroscopy_stage=spectroscopy_stage,
             pandabrick=pandabrick,
             spectroscopy_diodes=spectroscopy_diodes,
             scan_type=ScanType.STEP,
@@ -264,14 +265,14 @@ def test_spectroscopy_datasets(
 async def test_spectroscopy_sets_exposure_time_and_acquire_period(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     pandabrick: HDFPanda,
     spectroscopy_diodes: RGBDiodes,
 ):
     run_engine(
         spectroscopy(
             spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
+            spectroscopy_stage=spectroscopy_stage,
             pandabrick=pandabrick,
             spectroscopy_diodes=spectroscopy_diodes,
             exposure_time=1.0,
@@ -293,7 +294,7 @@ def test_demo_spectroscopy():
         # Call the generator function and exhaust it
         generator = demo_spectroscopy(
             spectroscopy_detector=fake_detector,
-            sample_stage=fake_stage,
+            spectroscopy_stage=fake_stage,
             total_number_of_scan_points=25,
             scan_type=ScanType.FLY,
         )
@@ -305,30 +306,30 @@ def test_demo_spectroscopy():
     mock_spec.assert_called_once()
     called_kwargs = mock_spec.call_args.kwargs
     assert called_kwargs["spectroscopy_detector"] is fake_detector
-    assert called_kwargs["sample_stage"] is fake_stage
+    assert called_kwargs["spectroscopy_stage"] is fake_stage
     assert called_kwargs["spec"] == Line(fake_stage.y, 0.0, 5.0, 5) * ~Line(
         fake_stage.x, 0.0, 5.0, 5
     )
     assert called_kwargs["scan_type"] == ScanType.FLY
 
 
-def test_serialize_spec_names_device_axes(sample_stage: XYZStage):
-    spec = Line(sample_stage.y, 4.2, 6, 3) * Line(sample_stage.x, 0, 5, 10)
+def test_serialize_spec_names_device_axes(spectroscopy_stage: XYZStage):
+    spec = Line(spectroscopy_stage.y, 4.2, 6, 3) * Line(spectroscopy_stage.x, 0, 5, 10)
 
     serialized = serialize_spec(spec)
 
-    assert serialized["outer"]["axis"] == sample_stage.y.name
-    assert serialized["inner"]["axis"] == sample_stage.x.name
+    assert serialized["outer"]["axis"] == spectroscopy_stage.y.name
+    assert serialized["inner"]["axis"] == spectroscopy_stage.x.name
     assert Spec.deserialize(serialized).axes() == [
-        sample_stage.y.name,
-        sample_stage.x.name,
+        spectroscopy_stage.y.name,
+        spectroscopy_stage.x.name,
     ]
 
 
 async def test_spectroscopy_sets_amplifier_range(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     pandabrick: HDFPanda,
     spectroscopy_diodes: RGBDiodes,
 ):
@@ -338,7 +339,7 @@ async def test_spectroscopy_sets_amplifier_range(
     run_engine(
         spectroscopy(
             spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
+            spectroscopy_stage=spectroscopy_stage,
             pandabrick=pandabrick,
             spectroscopy_diodes=spectroscopy_diodes,
             amplifier_range=EnzLocumRange.RANGE_10NA,
@@ -356,7 +357,7 @@ async def test_spectroscopy_sets_amplifier_range(
 def test_spectroscopy_rejects_auto_amplifier_range(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     spectroscopy_diodes: RGBDiodes,
 ):
     set_mock_value(spectroscopy_diodes.amplifier.range, EnzLocumRange.AUTO)
@@ -365,7 +366,7 @@ def test_spectroscopy_rejects_auto_amplifier_range(
         run_engine(
             spectroscopy(
                 spectroscopy_detector=spectroscopy_detector,
-                sample_stage=sample_stage,
+                spectroscopy_stage=spectroscopy_stage,
                 spectroscopy_diodes=spectroscopy_diodes,
                 scan_type=ScanType.STEP,
             )
@@ -375,13 +376,13 @@ def test_spectroscopy_rejects_auto_amplifier_range(
 def test_fly_scan_rejects_pandabox_without_diodes(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     pandabox: HDFPanda,
 ):
     with pytest.raises(ValueError, match="pandabox was given without diodes"):
         run_engine(
             fly_scan(
-                Line(sample_stage.x, 0, 5, 5),
+                Line(spectroscopy_stage.x, 0, 5, 5),
                 spectroscopy_detector,
                 pandabox=pandabox,
             )
@@ -391,13 +392,13 @@ def test_fly_scan_rejects_pandabox_without_diodes(
 def test_fly_scan_rejects_diodes_without_pandabox(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     spectroscopy_diodes: RGBDiodes,
 ):
     with pytest.raises(ValueError, match="diodes were given without pandabox"):
         run_engine(
             fly_scan(
-                Line(sample_stage.x, 0, 5, 5),
+                Line(spectroscopy_stage.x, 0, 5, 5),
                 spectroscopy_detector,
                 diodes=spectroscopy_diodes,
             )
@@ -407,7 +408,7 @@ def test_fly_scan_rejects_diodes_without_pandabox(
 def test_spectroscopy_fly_scan_uses_pandabox_and_diodes(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     pandabrick: HDFPanda,
     pandabox: HDFPanda,
     spectroscopy_diodes: RGBDiodes,
@@ -424,7 +425,7 @@ def test_spectroscopy_fly_scan_uses_pandabox_and_diodes(
         run_engine(
             spectroscopy(
                 spectroscopy_detector=spectroscopy_detector,
-                sample_stage=sample_stage,
+                spectroscopy_stage=spectroscopy_stage,
                 pandabrick=pandabrick,
                 pandabox=pandabox,
                 spectroscopy_diodes=spectroscopy_diodes,

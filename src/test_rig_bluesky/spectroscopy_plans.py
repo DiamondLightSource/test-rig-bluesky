@@ -38,7 +38,7 @@ LOGGER = logging.getLogger(__name__)
 spectroscopy_detector = inject("spectroscopy_detector")
 spectroscopy_diodes = inject("spectroscopy_diodes")
 pandabox = inject("pandabox")
-sample_stage = inject("spectroscopy_stage")
+spectroscopy_stage = inject("spectroscopy_stage")
 
 # The encoder entries map to specific axes, so despite the PandA being shared
 # hardware this list is spectroscopy's.
@@ -63,7 +63,7 @@ MAX_STAGE_VELOCITY = 10.0
 
 def spectroscopy(
     spectroscopy_detector: AravisDetector = spectroscopy_detector,
-    sample_stage: XYZStage = sample_stage,
+    spectroscopy_stage: XYZStage = spectroscopy_stage,
     pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
     pandabox: HDFPanda = pandabox,
@@ -154,8 +154,8 @@ def spectroscopy(
     yield from setup_ndattributes(spectroscopy_detector.roistat, params)  # type: ignore
 
     yield from load_settings(
-        device=sample_stage,
-        design_name="sample_stage_baseline",
+        device=spectroscopy_stage,
+        design_name="spectroscopy_stage_baseline",
         whitelist_pvs=[
             "x-acceleration_time",
             "x-velocity",
@@ -164,7 +164,7 @@ def spectroscopy(
         ],
     )
 
-    spec = spec or Line(sample_stage.x, 0, 5, 5)  # type: ignore
+    spec = spec or Line(spectroscopy_stage.x, 0, 5, 5)  # type: ignore
 
     # write json-serializable form of spec into metadata
     if metadata is None:
@@ -194,7 +194,7 @@ def spectroscopy(
     elif scan_type == ScanType.STEP:
         LOGGER.info("Performing a step scan.")
         yield from spec_scan(
-            {spectroscopy_detector, spectroscopy_diodes, sample_stage},
+            {spectroscopy_detector, spectroscopy_diodes, spectroscopy_stage},
             spec,  # type: ignore
             metadata=metadata,
         )
@@ -202,7 +202,7 @@ def spectroscopy(
 
 def demo_spectroscopy(
     spectroscopy_detector: AravisDetector = spectroscopy_detector,
-    sample_stage: XYZStage = sample_stage,
+    spectroscopy_stage: XYZStage = spectroscopy_stage,
     pmac: PmacIO = pmac,
     pandabrick: HDFPanda = pandabrick,
     pandabox: HDFPanda = pandabox,
@@ -240,18 +240,20 @@ def demo_spectroscopy(
     # Move to the start point
     # pmac should handle premove
     yield from bps.mv(
-        *(sample_stage.x, xmin), *(sample_stage.y, ymin), group="initial_move"
+        *(spectroscopy_stage.x, xmin),
+        *(spectroscopy_stage.y, ymin),
+        group="initial_move",
     )
 
-    grid = Line(sample_stage.y, ymin, ymax, ysteps) * ~Line(  # type: ignore
-        sample_stage.x,  # type: ignore
+    grid = Line(spectroscopy_stage.y, ymin, ymax, ysteps) * ~Line(  # type: ignore
+        spectroscopy_stage.x,  # type: ignore
         xmin,
         xmax,
         xsteps,
     )
     yield from spectroscopy(
         spectroscopy_detector=spectroscopy_detector,
-        sample_stage=sample_stage,
+        spectroscopy_stage=spectroscopy_stage,
         pmac=pmac,
         pandabrick=pandabrick,
         pandabox=pandabox,
