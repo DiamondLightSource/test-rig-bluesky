@@ -4,13 +4,16 @@ from collections import defaultdict
 from pathlib import Path
 from unittest.mock import ANY, AsyncMock, Mock, patch
 
+import bluesky.preprocessors as bpp
 import dodal.beamlines.b01_1 as b01_1
 import pytest
 import yaml
 from bluesky import RunEngine
+from bluesky.utils import Msg
 from dodal.devices.beamlines.b01_1.diodes import RGBDiodes
+from dodal.devices.beamlines.b01_1.flip_mirror import FlipMirror
 from dodal.devices.current_amplifiers import EnzLocumRange
-from dodal.devices.motors import XYZStage
+from dodal.devices.motors import XThetaStage, XYZStage
 from ophyd_async.core import (
     callback_on_mock_put,
     get_mock_put,
@@ -36,6 +39,11 @@ from test_rig_bluesky.spectroscopy_plans import (
     demo_spectroscopy,
     spectroscopy,
 )
+from test_rig_bluesky.tomography_plans import (
+    SAMPLE_IN_X,
+    SAMPLE_OUT_X,
+    tomography,
+)
 
 
 @pytest.fixture
@@ -46,7 +54,7 @@ def spectroscopy_detector(run_engine: RunEngine) -> AravisDetector:
 
 
 @pytest.fixture
-def sample_stage(run_engine: RunEngine) -> XYZStage:
+def spectroscopy_stage(run_engine: RunEngine) -> XYZStage:
     stage = b01_1.spectroscopy_stage.build(connect_immediately=True, mock=True)
 
     set_mock_value(stage.x.low_limit_travel, -10.0)
@@ -92,8 +100,14 @@ def _mock_detector_behavior(detector: AravisDetector) -> None:
         if acquire:
             asyncio.create_task(mock_acquisition())
 
+    def on_capture(capture: bool) -> None:
+        # Like the IOC, start counting from zero for each new file
+        if capture:
+            set_mock_value(hdf.num_captured, 0)
+
     set_mock_value(hdf.file_path_exists, True)
     callback_on_mock_put(detector.driver.acquire, on_acquire)
+    callback_on_mock_put(hdf.capture, on_capture)
 
 
 @patch("test_rig_bluesky.plans.YamlSettingsProvider")
@@ -143,12 +157,12 @@ async def test_load_settings(
 def test_snapshot(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
 ):
     docs = defaultdict(list)
     run_engine.subscribe(lambda name, doc: docs[name].append(doc))
 
-    run_engine(snapshot([spectroscopy_detector, sample_stage]))
+    run_engine(snapshot([spectroscopy_detector, spectroscopy_stage]))
 
     assert_emitted(
         docs, start=1, descriptor=1, stream_resource=1, stream_datum=1, event=1, stop=1
@@ -164,7 +178,7 @@ def test_snapshot(
 async def test_spectroscopy(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     pandabrick: HDFPanda,
     spectroscopy_diodes: RGBDiodes,
 ):
@@ -173,11 +187,12 @@ async def test_spectroscopy(
 
     run_engine(
         spectroscopy(
-            spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
+            detector=spectroscopy_detector,
+            stage=spectroscopy_stage,
             pandabrick=pandabrick,
-            spectroscopy_diodes=spectroscopy_diodes,
-            spec=Line(sample_stage.y, 4.2, 6, 3) * Line(sample_stage.x, 0, 5, 10),
+            diodes=spectroscopy_diodes,
+            spec=Line(spectroscopy_stage.y, 4.2, 6, 3)
+            * Line(spectroscopy_stage.x, 0, 5, 10),
             exposure_time=0.2,
             scan_type=ScanType.STEP,
         )
@@ -199,7 +214,7 @@ async def test_spectroscopy(
 async def test_spectroscopy_defaults(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     pandabrick: HDFPanda,
     spectroscopy_diodes: RGBDiodes,
 ):
@@ -208,10 +223,10 @@ async def test_spectroscopy_defaults(
 
     run_engine(
         spectroscopy(
-            spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
+            detector=spectroscopy_detector,
+            stage=spectroscopy_stage,
             pandabrick=pandabrick,
-            spectroscopy_diodes=spectroscopy_diodes,
+            diodes=spectroscopy_diodes,
             scan_type=ScanType.STEP,
         )
     )
@@ -232,7 +247,7 @@ async def test_spectroscopy_defaults(
 def test_spectroscopy_datasets(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     pandabrick: HDFPanda,
     spectroscopy_diodes: RGBDiodes,
 ):
@@ -241,10 +256,10 @@ def test_spectroscopy_datasets(
 
     run_engine(
         spectroscopy(
-            spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
+            detector=spectroscopy_detector,
+            stage=spectroscopy_stage,
             pandabrick=pandabrick,
-            spectroscopy_diodes=spectroscopy_diodes,
+            diodes=spectroscopy_diodes,
             scan_type=ScanType.STEP,
         )
     )
@@ -264,16 +279,16 @@ def test_spectroscopy_datasets(
 async def test_spectroscopy_sets_exposure_time_and_acquire_period(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     pandabrick: HDFPanda,
     spectroscopy_diodes: RGBDiodes,
 ):
     run_engine(
         spectroscopy(
-            spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
+            detector=spectroscopy_detector,
+            stage=spectroscopy_stage,
             pandabrick=pandabrick,
-            spectroscopy_diodes=spectroscopy_diodes,
+            diodes=spectroscopy_diodes,
             exposure_time=1.0,
             scan_type=ScanType.STEP,
         )
@@ -292,8 +307,8 @@ def test_demo_spectroscopy():
     ) as mock_spec:
         # Call the generator function and exhaust it
         generator = demo_spectroscopy(
-            spectroscopy_detector=fake_detector,
-            sample_stage=fake_stage,
+            detector=fake_detector,
+            stage=fake_stage,
             total_number_of_scan_points=25,
             scan_type=ScanType.FLY,
         )
@@ -304,31 +319,31 @@ def test_demo_spectroscopy():
 
     mock_spec.assert_called_once()
     called_kwargs = mock_spec.call_args.kwargs
-    assert called_kwargs["spectroscopy_detector"] is fake_detector
-    assert called_kwargs["sample_stage"] is fake_stage
+    assert called_kwargs["detector"] is fake_detector
+    assert called_kwargs["stage"] is fake_stage
     assert called_kwargs["spec"] == Line(fake_stage.y, 0.0, 5.0, 5) * ~Line(
         fake_stage.x, 0.0, 5.0, 5
     )
     assert called_kwargs["scan_type"] == ScanType.FLY
 
 
-def test_serialize_spec_names_device_axes(sample_stage: XYZStage):
-    spec = Line(sample_stage.y, 4.2, 6, 3) * Line(sample_stage.x, 0, 5, 10)
+def test_serialize_spec_names_device_axes(spectroscopy_stage: XYZStage):
+    spec = Line(spectroscopy_stage.y, 4.2, 6, 3) * Line(spectroscopy_stage.x, 0, 5, 10)
 
     serialized = serialize_spec(spec)
 
-    assert serialized["outer"]["axis"] == sample_stage.y.name
-    assert serialized["inner"]["axis"] == sample_stage.x.name
+    assert serialized["outer"]["axis"] == spectroscopy_stage.y.name
+    assert serialized["inner"]["axis"] == spectroscopy_stage.x.name
     assert Spec.deserialize(serialized).axes() == [
-        sample_stage.y.name,
-        sample_stage.x.name,
+        spectroscopy_stage.y.name,
+        spectroscopy_stage.x.name,
     ]
 
 
 async def test_spectroscopy_sets_amplifier_range(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     pandabrick: HDFPanda,
     spectroscopy_diodes: RGBDiodes,
 ):
@@ -337,10 +352,10 @@ async def test_spectroscopy_sets_amplifier_range(
 
     run_engine(
         spectroscopy(
-            spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
+            detector=spectroscopy_detector,
+            stage=spectroscopy_stage,
             pandabrick=pandabrick,
-            spectroscopy_diodes=spectroscopy_diodes,
+            diodes=spectroscopy_diodes,
             amplifier_range=EnzLocumRange.RANGE_10NA,
             scan_type=ScanType.STEP,
         )
@@ -356,7 +371,7 @@ async def test_spectroscopy_sets_amplifier_range(
 def test_spectroscopy_rejects_auto_amplifier_range(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     spectroscopy_diodes: RGBDiodes,
 ):
     set_mock_value(spectroscopy_diodes.amplifier.range, EnzLocumRange.AUTO)
@@ -364,9 +379,9 @@ def test_spectroscopy_rejects_auto_amplifier_range(
     with pytest.raises(ValueError, match="Auto"):
         run_engine(
             spectroscopy(
-                spectroscopy_detector=spectroscopy_detector,
-                sample_stage=sample_stage,
-                spectroscopy_diodes=spectroscopy_diodes,
+                detector=spectroscopy_detector,
+                stage=spectroscopy_stage,
+                diodes=spectroscopy_diodes,
                 scan_type=ScanType.STEP,
             )
         )
@@ -375,13 +390,13 @@ def test_spectroscopy_rejects_auto_amplifier_range(
 def test_fly_scan_rejects_pandabox_without_diodes(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     pandabox: HDFPanda,
 ):
     with pytest.raises(ValueError, match="pandabox was given without diodes"):
         run_engine(
             fly_scan(
-                Line(sample_stage.x, 0, 5, 5),
+                Line(spectroscopy_stage.x, 0, 5, 5),
                 spectroscopy_detector,
                 pandabox=pandabox,
             )
@@ -391,13 +406,13 @@ def test_fly_scan_rejects_pandabox_without_diodes(
 def test_fly_scan_rejects_diodes_without_pandabox(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     spectroscopy_diodes: RGBDiodes,
 ):
     with pytest.raises(ValueError, match="diodes were given without pandabox"):
         run_engine(
             fly_scan(
-                Line(sample_stage.x, 0, 5, 5),
+                Line(spectroscopy_stage.x, 0, 5, 5),
                 spectroscopy_detector,
                 diodes=spectroscopy_diodes,
             )
@@ -407,7 +422,7 @@ def test_fly_scan_rejects_diodes_without_pandabox(
 def test_spectroscopy_fly_scan_uses_pandabox_and_diodes(
     run_engine: RunEngine,
     spectroscopy_detector: AravisDetector,
-    sample_stage: XYZStage,
+    spectroscopy_stage: XYZStage,
     pandabrick: HDFPanda,
     pandabox: HDFPanda,
     spectroscopy_diodes: RGBDiodes,
@@ -423,11 +438,11 @@ def test_spectroscopy_fly_scan_uses_pandabox_and_diodes(
     ):
         run_engine(
             spectroscopy(
-                spectroscopy_detector=spectroscopy_detector,
-                sample_stage=sample_stage,
+                detector=spectroscopy_detector,
+                stage=spectroscopy_stage,
                 pandabrick=pandabrick,
                 pandabox=pandabox,
-                spectroscopy_diodes=spectroscopy_diodes,
+                diodes=spectroscopy_diodes,
                 scan_type=ScanType.FLY,
             )
         )
@@ -454,3 +469,107 @@ def test_pandabox_baseline_captures_diodes_under_their_names(
     assert datasets["fmc_in.val5_dataset"] == spectroscopy_diodes.red.name
     assert datasets["fmc_in.val6_dataset"] == spectroscopy_diodes.green.name
     assert datasets["fmc_in.val7_dataset"] == spectroscopy_diodes.blue.name
+
+
+@pytest.fixture
+def tomography_detector(run_engine: RunEngine) -> AravisDetector:
+    det = b01_1.tomography_detector.build(connect_immediately=True, mock=True)
+    _mock_detector_behavior(det)
+    return det
+
+
+@pytest.fixture
+def tomography_stage(run_engine: RunEngine) -> XThetaStage:
+    stage = b01_1.tomography_stage.build(connect_immediately=True, mock=True)
+
+    set_mock_value(stage.x.low_limit_travel, -10.0)
+    set_mock_value(stage.x.high_limit_travel, 10.0)
+    set_mock_value(stage.x.velocity, 1.0)
+    set_mock_value(stage.x.user_readback, 5.0)
+    set_mock_value(stage.theta.low_limit_travel, -400.0)
+    set_mock_value(stage.theta.high_limit_travel, 400.0)
+    set_mock_value(stage.theta.velocity, 10.0)
+
+    return stage
+
+
+@pytest.fixture
+def tomography_flip_mirror(run_engine: RunEngine) -> FlipMirror:
+    mirror = b01_1.tomography_flip_mirror.build(connect_immediately=True, mock=True)
+    set_mock_value(mirror.position, True)
+    return mirror
+
+
+@pytest.fixture
+def spectroscopy_flip_mirror(run_engine: RunEngine) -> FlipMirror:
+    mirror = b01_1.spectroscopy_flip_mirror.build(connect_immediately=True, mock=True)
+    set_mock_value(mirror.position, True)
+    return mirror
+
+
+def test_tomography_takes_darks_then_flats_then_projections(
+    run_engine: RunEngine,
+    tomography_detector: AravisDetector,
+    tomography_stage: XThetaStage,
+    tomography_flip_mirror: FlipMirror,
+    spectroscopy_flip_mirror: FlipMirror,
+):
+    messages: list[Msg] = []
+
+    def record(msg: Msg) -> Msg:
+        messages.append(msg)
+        return msg
+
+    starts = []
+    run_engine.subscribe(lambda name, doc: starts.append(doc), "start")
+
+    run_engine(
+        bpp.msg_mutator(
+            tomography(
+                detector=tomography_detector,
+                stage=tomography_stage,
+                tomography_flip_mirror=tomography_flip_mirror,
+                spectroscopy_flip_mirror=spectroscopy_flip_mirror,
+                spec=Line(tomography_stage.theta, 0, 3, 4),
+                num_calibration_images=2,
+                scan_type=ScanType.STEP,
+            ),
+            record,
+        )
+    )
+
+    darks, flats, projections = starts
+    assert [start["image_key"] for start in starts] == ["dark", "flat", "projection"]
+    assert [start["num_points"] for start in starts] == [2, 2, 4]
+    assert len({start["tomography_group"] for start in starts}) == 1
+    assert projections["darks_uid"] == darks["uid"]
+    assert projections["flats_uid"] == flats["uid"]
+
+    # Each run is preceded by the moves that set it up
+    sets_and_opens = [
+        (msg.command, msg.obj, msg.args)
+        for msg in messages
+        if msg.command == "open_run"
+        or (
+            msg.command == "set"
+            and msg.obj
+            in (tomography_stage.x, tomography_flip_mirror, spectroscopy_flip_mirror)
+        )
+    ]
+    assert sets_and_opens == [
+        # Darks: sample out, no light
+        ("set", tomography_stage.x, (SAMPLE_OUT_X,)),
+        ("set", spectroscopy_flip_mirror, (False,)),
+        ("set", tomography_flip_mirror, (False,)),
+        ("open_run", None, ()),
+        # Flats: sample out, light on
+        ("set", tomography_stage.x, (SAMPLE_OUT_X,)),
+        ("set", spectroscopy_flip_mirror, (False,)),
+        ("set", tomography_flip_mirror, (True,)),
+        ("open_run", None, ()),
+        # Projections: sample in, light on
+        ("set", tomography_stage.x, (SAMPLE_IN_X,)),
+        ("set", spectroscopy_flip_mirror, (False,)),
+        ("set", tomography_flip_mirror, (True,)),
+        ("open_run", None, ()),
+    ]

@@ -117,14 +117,16 @@ def test_generic_scan(
 def test_spectroscopy_re():
     run_engine = RunEngine()
     spectroscopy_detector = b01_1.spectroscopy_detector.build(connect_immediately=True)
-    sample_stage = b01_1.spectroscopy_stage.build(connect_immediately=True)
+    spectroscopy_stage = b01_1.spectroscopy_stage.build(connect_immediately=True)
 
-    scan_spec = Line(sample_stage.y, 0, 5, 50) * Line(sample_stage.x, 2, 5, 30)
+    scan_spec = Line(spectroscopy_stage.y, 0, 5, 50) * Line(
+        spectroscopy_stage.x, 2, 5, 30
+    )
 
     run_engine(
         spectroscopy(
-            spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
+            detector=spectroscopy_detector,
+            stage=spectroscopy_stage,
             spec=scan_spec,
             scan_type=ScanType.FLY,
         )
@@ -168,14 +170,16 @@ def test_spectroscopy_re_run_engine():
     run_engine = RunEngine()
 
     spectroscopy_detector = b01_1.spectroscopy_detector.build(connect_immediately=True)
-    sample_stage = b01_1.spectroscopy_stage.build(connect_immediately=True)
+    spectroscopy_stage = b01_1.spectroscopy_stage.build(connect_immediately=True)
 
-    scan_spec = Line(sample_stage.y, 0, 5, 50) * Line(sample_stage.x, 2, 5, 30)
+    scan_spec = Line(spectroscopy_stage.y, 0, 5, 50) * Line(
+        spectroscopy_stage.x, 2, 5, 30
+    )
 
     run_engine(
         spectroscopy(
-            spectroscopy_detector=spectroscopy_detector,
-            sample_stage=sample_stage,
+            detector=spectroscopy_detector,
+            stage=spectroscopy_stage,
             spec=scan_spec,
             scan_type=ScanType.STEP,
         )
