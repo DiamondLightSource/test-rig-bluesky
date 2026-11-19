@@ -173,7 +173,7 @@ def tomography(
             exposure_time=exposure_time,
             detector_deadtime=MAKO_DETECTOR_DEADTIME,
             detector_trigger=TOMOGRAPHY_DETECTOR_TRIGGER,
-            panda_whitelist=PANDA_WHITELIST,
+            pandabrick_whitelist=PANDA_WHITELIST,
             plan_name="tomography_fly_scan",
             metadata=metadata,
         )

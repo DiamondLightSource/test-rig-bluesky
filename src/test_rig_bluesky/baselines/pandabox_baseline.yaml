@@ -1,0 +1,6 @@
+fmc_in.val5_capture: Mean
+fmc_in.val5_dataset: spectroscopy_diodes-red
+fmc_in.val6_capture: Mean
+fmc_in.val6_dataset: spectroscopy_diodes-green
+fmc_in.val7_capture: Mean
+fmc_in.val7_dataset: spectroscopy_diodes-blue
