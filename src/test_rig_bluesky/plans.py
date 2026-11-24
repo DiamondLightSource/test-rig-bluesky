@@ -135,6 +135,7 @@ def fly_scan(
     metadata: dict[str, Any] | None = None,
     pandabox: HDFPanda | None = None,
     diodes: Readable | None = None,
+    detector_trigger_source: str | None = None,
 ):
     """Fly scan a triggered detector along a spec."""
     # The pandabox captures the diode counts, which only mean something alongside
@@ -222,6 +223,16 @@ def fly_scan(
         # prepare detector and info
         # waiting for this last prepare means all prepare functions will be complete
         yield from bps.prepare(detector, detector_info, wait=True)
+
+        # ophyd-async's Aravis trigger logic hard-codes TriggerSource=Line1 in
+        # prepare. Cameras wired to a different input (e.g. the Alvium on Line0)
+        # need it overridden here, after prepare and before kickoff.
+        if detector_trigger_source is not None:
+            yield from bps.abs_set(
+                detector.driver.trigger_source,  # type: ignore
+                detector_trigger_source,
+                wait=True,
+            )
 
         # Need to run this after detectors are prepared
         yield from bps.declare_stream(

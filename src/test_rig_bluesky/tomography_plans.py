@@ -40,6 +40,8 @@ class ImageType(StrEnum):
     PROJECTION = "projection"
 
 
+# The Alvium's trigger input is the Line0 GPIO
+DETECTOR_TRIGGER_SOURCE = "Line0"
 # Metadata key holding the run's ImageType
 IMAGE_KEY = "image_key"
 # Shared by the darks, flats and projections runs of one tomography scan
@@ -49,7 +51,7 @@ DARKS_UID_KEY = "darks_uid"
 FLATS_UID_KEY = "flats_uid"
 
 # Tomography stage x positions, in mm
-SAMPLE_OUT_X = 0.0  # TODO: placeholder, sample out of the field of view for flats
+SAMPLE_OUT_X = 40.0  # TODO: placeholder, sample out of the field of view for flats
 SAMPLE_IN_X = 0.0  # TODO: placeholder, sample back in the field of view
 
 # Where the sample sits and whether the tomography light is on for each image type.
@@ -193,6 +195,7 @@ def _collect_projections(
             exposure_time=exposure_time,
             detector_deadtime=ALVIUM_DETECTOR_DEADTIME,
             detector_trigger=DETECTOR_TRIGGER,
+            detector_trigger_source=DETECTOR_TRIGGER_SOURCE,
             pandabrick_whitelist=PANDA_WHITELIST,
             plan_name="tomography_fly_scan",
             metadata=metadata,
@@ -227,7 +230,7 @@ def tomography(
     pandabrick: HDFPanda = pandabrick,
     exposure_time: float = 0.1,
     spec: Spec[Movable] | None = None,
-    num_calibration_images: int = 20,
+    num_calibration_images: int = 3,
     metadata: dict[str, Any] | None = None,
     *,
     scan_type: ScanType,

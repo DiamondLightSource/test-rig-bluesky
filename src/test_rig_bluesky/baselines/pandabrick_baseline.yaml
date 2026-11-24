@@ -368,7 +368,7 @@ incenc.8.conn_capture: false
 incenc.8.protocol: Quadrature
 incenc.8.rst_on_z: false
 incenc.8.val_capture: "No"
-incenc.8.val_dataset: ""
+incenc.8.val_dataset: THETA
 incenc.8.val_offset: 0.0
 incenc.8.val_scale: 0.0
 lut.1.func: ""
